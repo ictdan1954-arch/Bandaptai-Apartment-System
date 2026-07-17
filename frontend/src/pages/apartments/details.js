@@ -1,6 +1,7 @@
 import { apiService } from '../../services/api.service.js';
 import { authService } from '../../services/auth.service.js';
 import { formatDate, formatCurrency } from '../../utils/formatters.js';
+import { showToast } from '../../components/toast.js';
 import { router } from '../../router.js';
 
 export default async function apartmentDetails(container, params) {
@@ -11,6 +12,7 @@ export default async function apartmentDetails(container, params) {
         const response = await apiService.get(`/apartments/${id}`);
         if (!response.success) throw new Error('Apartment not found');
         const a = response.data;
+        const userRole = authService.getRole();
 
         container.innerHTML = `
             <div class="mb-2">
@@ -51,15 +53,149 @@ export default async function apartmentDetails(container, params) {
                     </div>
                 </div>
             </div>
-            <div style="display:flex; gap:12px;">
+
+            <!-- Action Buttons -->
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom: 24px;">
                 <button class="btn btn-primary" onclick="window.router.navigate('/units/${a.id}')">
                     <i class="fas fa-door-open"></i> View Units
                 </button>
                 <button class="btn btn-outline" onclick="window.router.navigate('/payments/rent?apartment=${a.id}')">
                     <i class="fas fa-money-bill-wave"></i> Rent Payments
                 </button>
-            </div>`;
+                <button class="btn btn-outline" onclick="window.router.navigate('/expenses?apartment=${a.id}')">
+                    <i class="fas fa-receipt"></i> Expenses
+                </button>
+            </div>
+
+            <!-- Caretaker Management (Landlord only) -->
+            ${userRole === 'landlord' ? `
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Caretakers</h3>
+                    <button class="btn btn-primary btn-sm" id="assign-caretaker-btn">
+                        <i class="fas fa-user-plus"></i> Assign Caretaker
+                    </button>
+                </div>
+                <div id="caretakers-list" class="table-container">
+                    <div class="page-loader"><div class="spinner"></div></div>
+                </div>
+            </div>` : ''}
+        `;
+
+        // Load caretakers if landlord
+        if (userRole === 'landlord') {
+            loadCaretakers(id);
+            document.getElementById('assign-caretaker-btn').addEventListener('click', () => openAssignCaretaker(id));
+        }
     } catch (error) {
         container.innerHTML = `<div class="error-state"><h2>Error</h2><p>${error.message}</p></div>`;
     }
+}
+
+// =============================================
+// CARETAKER FUNCTIONS
+// =============================================
+async function loadCaretakers(apartmentId) {
+    try {
+        const res = await apiService.get(`/apartments/${apartmentId}/caretakers`);
+        if (!res.success) throw new Error('Failed to load caretakers');
+
+        const caretakers = res.data;
+        const container = document.getElementById('caretakers-list');
+
+        if (!caretakers || caretakers.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-tie"></i>
+                    <p>No caretakers assigned to this apartment yet.</p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Assigned Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${caretakers.map(c => `
+                        <tr>
+                            <td>${c.users?.full_name || 'N/A'}</td>
+                            <td>${c.users?.phone || 'N/A'}</td>
+                            <td>${c.users?.email || '-'}</td>
+                            <td>${formatDate(c.assigned_at)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" onclick="removeCaretaker('${c.id}')">
+                                    <i class="fas fa-trash"></i> Remove
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+
+        // Attach global remove handler
+        window.removeCaretaker = (assignmentId) => removeCaretakerHandler(assignmentId, apartmentId);
+    } catch (error) {
+        document.getElementById('caretakers-list').innerHTML = `
+            <div class="error-state"><p>${error.message}</p></div>`;
+    }
+}
+
+async function openAssignCaretaker(apartmentId) {
+    // Fetch all caretaker users
+    const usersRes = await apiService.get('/auth/users?role=caretaker');
+    if (!usersRes.success) {
+        showToast('Failed to load caretakers', 'error');
+        return;
+    }
+
+    const caretakers = usersRes.data;
+    if (caretakers.length === 0) {
+        showToast('No caretaker accounts exist. Create one from Staff Members first.', 'warning');
+        return;
+    }
+
+    // Filter out already assigned caretakers? For now, show all.
+    // We'll let the backend reject duplicates.
+
+    const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Select Caretaker</label>
+            <select class="form-select" id="caretaker-select">
+                ${caretakers.map(u => `<option value="${u.id}">${u.full_name} (${u.phone})</option>`).join('')}
+            </select>
+        </div>`;
+
+    const { showFormModal } = await import('../../components/modal.js');
+    showFormModal('Assign Caretaker', formHtml, async (overlay) => {
+        const userId = overlay.querySelector('#caretaker-select').value;
+        try {
+            await apiService.post(`/apartments/${apartmentId}/caretakers`, { user_id: userId });
+            showToast('Caretaker assigned successfully', 'success');
+            loadCaretakers(apartmentId);
+        } catch (e) {
+            showToast(e.message, 'error');
+            return false; // keep modal open
+        }
+    });
+}
+
+async function removeCaretakerHandler(assignmentId, apartmentId) {
+    const { showConfirm } = await import('../../components/modal.js');
+    showConfirm('Remove Caretaker', 'Are you sure you want to remove this caretaker from the apartment?', async () => {
+        try {
+            await apiService.delete(`/apartments/caretakers/${assignmentId}`);
+            showToast('Caretaker removed', 'success');
+            loadCaretakers(apartmentId);
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    });
 }
