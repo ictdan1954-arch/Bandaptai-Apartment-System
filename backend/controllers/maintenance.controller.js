@@ -80,7 +80,8 @@ const maintenanceController = {
                 .select(`
                     *,
                     units:unit_id(id, unit_number),
-                    reported_by_user:reported_by(id, full_name)
+                    reported_by_user:reported_by(id, full_name),
+                    assigned_staff:assigned_staff_id(id, full_name)
                 `)
                 .eq('apartment_id', apartmentId);
 
@@ -99,7 +100,7 @@ const maintenanceController = {
         }
     },
 
-    // Get single maintenance request (with comments)
+    // Get single maintenance request (with comments and assigned staff)
     async getById(req, res) {
         try {
             const { id } = req.params;
@@ -110,6 +111,7 @@ const maintenanceController = {
                     *,
                     units:unit_id(*),
                     reported_by_user:reported_by(id, full_name, phone),
+                    assigned_staff:assigned_staff_id(id, full_name),
                     comments:maintenance_comments(
                         id, comment, created_at,
                         user:user_id(id, full_name, role)
@@ -145,13 +147,16 @@ const maintenanceController = {
         }
     },
 
-    // Update maintenance request
+    // Update maintenance request (now supports assigned_staff_id)
     async update(req, res) {
         try {
             const { id } = req.params;
             const updateData = {};
 
-            const allowedFields = ['title', 'description', 'priority', 'status', 'assigned_to', 'cost_incurred', 'date_resolved'];
+            const allowedFields = [
+                'title', 'description', 'priority', 'status',
+                'assigned_to', 'assigned_staff_id', 'cost_incurred', 'date_resolved'
+            ];
             allowedFields.forEach(field => {
                 if (req.body[field] !== undefined) {
                     updateData[field] = req.body[field];
@@ -179,6 +184,31 @@ const maintenanceController = {
                     message: `Your request "${request.title}" is now ${req.body.status}`,
                     type: 'maintenance_update'
                 }]);
+            }
+
+            // If assigned_staff_id is set, notify that staff member
+            if (req.body.assigned_staff_id) {
+                const { data: staff } = await supabase
+                    .from('staff_members')
+                    .select('phone')
+                    .eq('id', req.body.assigned_staff_id)
+                    .single();
+                if (staff?.phone) {
+                    const { data: staffUser } = await supabase
+                        .from('users')
+                        .select('id')
+                        .eq('phone', staff.phone)
+                        .eq('role', 'staff')
+                        .single();
+                    if (staffUser) {
+                        await supabase.from('notifications').insert([{
+                            user_id: staffUser.id,
+                            title: 'New Maintenance Task Assigned',
+                            message: `You have been assigned: "${request.title}"`,
+                            type: 'maintenance_update'
+                        }]);
+                    }
+                }
             }
 
             return ApiResponse.success(res, request, 'Maintenance request updated successfully');
@@ -232,7 +262,7 @@ const maintenanceController = {
     // Add comment
     async createComment(req, res) {
         try {
-            const { id } = req.params;                     // corrected
+            const { id } = req.params;
             const { comment } = req.body;
             if (!comment || !comment.trim()) {
                 return ApiResponse.badRequest(res, 'Comment is required');
@@ -253,7 +283,7 @@ const maintenanceController = {
             // Notify the other participants
             const { data: request } = await supabase
                 .from('maintenance_requests')
-                .select('reported_by, apartment_id')
+                .select('reported_by, apartment_id, assigned_staff_id')
                 .eq('id', id)
                 .single();
 
@@ -285,6 +315,31 @@ const maintenanceController = {
                         await supabase.from('notifications').insert(notifs);
                     }
                 }
+
+                // Notify assigned staff if a comment is added by someone else
+                if (request.assigned_staff_id) {
+                    const { data: staff } = await supabase
+                        .from('staff_members')
+                        .select('phone')
+                        .eq('id', request.assigned_staff_id)
+                        .single();
+                    if (staff?.phone) {
+                        const { data: staffUser } = await supabase
+                            .from('users')
+                            .select('id')
+                            .eq('phone', staff.phone)
+                            .eq('role', 'staff')
+                            .single();
+                        if (staffUser && staffUser.id !== req.user.id) {
+                            await supabase.from('notifications').insert([{
+                                user_id: staffUser.id,
+                                title: 'New Comment on Your Task',
+                                message: `${req.user.role} commented: "${comment.trim().substring(0, 50)}..."`,
+                                type: 'maintenance_update'
+                            }]);
+                        }
+                    }
+                }
             }
 
             return ApiResponse.created(res, newComment, 'Comment added');
@@ -296,7 +351,7 @@ const maintenanceController = {
     // Get comments for a request
     async getComments(req, res) {
         try {
-            const { id } = req.params;                     // corrected
+            const { id } = req.params;
             const { data: comments, error } = await supabase
                 .from('maintenance_comments')
                 .select('*, user:user_id(id, full_name, role)')
