@@ -1,3 +1,4 @@
+const bcrypt = require('bcryptjs');
 const supabase = require('../config/supabase');
 const ApiResponse = require('../utils/response');
 const { validateRequired } = require('../utils/validators');
@@ -190,6 +191,63 @@ const staffController = {
             return ApiResponse.success(res, null, 'Staff member terminated');
         } catch (error) {
             return ApiResponse.error(res, 'Failed to terminate staff member');
+        }
+    },
+
+    // =============================================
+    // CREATE USER ACCOUNT FOR A STAFF MEMBER
+    // =============================================
+    async createStaffAccount(req, res) {
+        try {
+            const { staff_id, username, password } = req.body;
+            const missing = validateRequired(req.body, ['staff_id', 'username', 'password']);
+            if (missing.length > 0) {
+                return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
+            }
+
+            // Fetch staff member details
+            const { data: staff } = await supabase
+                .from('staff_members')
+                .select('full_name, phone')
+                .eq('id', staff_id)
+                .single();
+
+            if (!staff) {
+                return ApiResponse.notFound(res, 'Staff member not found');
+            }
+
+            // Validate password
+            if (password.length < 6) {
+                return ApiResponse.badRequest(res, 'Password must be at least 6 characters');
+            }
+
+            // Hash password
+            const salt = await bcrypt.genSalt(10);
+            const password_hash = await bcrypt.hash(password, salt);
+
+            // Create user with role 'staff'
+            const { data: user, error: userError } = await supabase
+                .from('users')
+                .insert([{
+                    full_name: staff.full_name,
+                    phone: staff.phone,
+                    password_hash,
+                    role: 'staff',
+                    username
+                }])
+                .select('id, full_name, phone, username, role')
+                .single();
+
+            if (userError) {
+                if (userError.code === '23505') {
+                    return ApiResponse.badRequest(res, 'Username or phone already exists. Use a different username.');
+                }
+                throw userError;
+            }
+
+            return ApiResponse.created(res, user, 'Staff account created successfully');
+        } catch (error) {
+            return ApiResponse.error(res, 'Failed to create staff account');
         }
     },
 
