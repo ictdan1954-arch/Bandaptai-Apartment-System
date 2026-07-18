@@ -1,5 +1,5 @@
 import { apiService } from '../../services/api.service.js';
-import { authService } from '../../services/auth.service.js';  // added for role check
+import { authService } from '../../services/auth.service.js';
 import { formatCurrency, formatDate, capitalize } from '../../utils/formatters.js';
 import { router } from '../../router.js';
 import { showToast } from '../../components/toast.js';
@@ -20,10 +20,7 @@ export default async function tenantDetails(container, params) {
             tenant = response.data.tenant;
         }
 
-        // Fetch payments
-        const paymentsResponse = id
-            ? await apiService.get(`/tenants/${tenant.id}/payments`)
-            : { data: [] };
+        const paymentsResponse = id ? await apiService.get(`/tenants/${tenant.id}/payments`) : { data: [] };
         const payments = paymentsResponse.data || [];
 
         container.innerHTML = `
@@ -64,9 +61,15 @@ export default async function tenantDetails(container, params) {
                     ${tenant.id_number ? `<p><strong>ID Number:</strong> ${tenant.id_number}</p>` : ''}
                 </div>
                 ${tenant.status === 'active' ? `
-                <button class="btn btn-outline mt-2" id="change-unit-btn">
-                    <i class="fas fa-exchange-alt"></i> Change Unit
-                </button>` : ''}
+                <div style="display:flex; gap:12px; margin-top: 16px;">
+                    <button class="btn btn-outline" id="change-unit-btn">
+                        <i class="fas fa-exchange-alt"></i> Change Unit
+                    </button>
+                    ${id ? `
+                    <button class="btn btn-outline" id="show-credentials-btn">
+                        <i class="fas fa-key"></i> Show Credentials
+                    </button>` : ''}
+                </div>` : ''}
             </div>
 
             <!-- Payments Table -->
@@ -96,9 +99,12 @@ export default async function tenantDetails(container, params) {
                 </div>
             </div>`;
 
-        // Attach event listeners
+        // Event listeners
         if (tenant.status === 'active') {
             document.getElementById('change-unit-btn').addEventListener('click', () => openChangeUnitModal(tenant));
+            if (id) {
+                document.getElementById('show-credentials-btn').addEventListener('click', () => showCredentialsModal(tenant));
+            }
         }
 
         if (id) {
@@ -107,7 +113,6 @@ export default async function tenantDetails(container, params) {
             });
         }
 
-        // Record payment function (kept global for the button's onclick, though we could scope it)
         window.recordPayment = recordPayment;
 
     } catch (error) {
@@ -115,7 +120,7 @@ export default async function tenantDetails(container, params) {
     }
 }
 
-// Payment recording function (unchanged)
+// Payment recording
 function recordPayment(tenantId, unitId, apartmentId) {
     import('../../components/modal.js').then(({ showFormModal }) => {
         const today = new Date().toISOString().split('T')[0];
@@ -160,7 +165,6 @@ function recordPayment(tenantId, unitId, apartmentId) {
 async function openChangeUnitModal(tenant) {
     const { showFormModal } = await import('../../components/modal.js');
 
-    // Determine which apartment to fetch units from
     let apartmentId;
     if (authService.getRole() === 'caretaker') {
         const aptRes = await apiService.get('/apartments');
@@ -168,7 +172,6 @@ async function openChangeUnitModal(tenant) {
             apartmentId = aptRes.data[0].id;
         }
     } else {
-        // landlord – use the tenant's current apartment
         apartmentId = tenant.units?.apartment_id;
     }
 
@@ -177,7 +180,6 @@ async function openChangeUnitModal(tenant) {
         return;
     }
 
-    // Fetch vacant units for that apartment
     const unitsRes = await apiService.get(`/units/apartment/${apartmentId}`);
     const vacantUnits = unitsRes.success ? unitsRes.data.filter(u => u.status === 'vacant') : [];
 
@@ -200,10 +202,41 @@ async function openChangeUnitModal(tenant) {
         try {
             await apiService.put(`/tenants/${tenant.id}`, { unit_id: newUnitId });
             showToast('Unit changed successfully', 'success');
-            location.reload(); // refresh to reflect changes
+            location.reload();
         } catch (e) {
             showToast(e.message, 'error');
             return false;
+        }
+    });
+}
+
+// Show Credentials modal
+async function showCredentialsModal(tenant) {
+    const { showFormModal } = await import('../../components/modal.js');
+
+    // The tenant object should contain user.username from the updated backend
+    const username = tenant.user?.username || 'Unknown';
+    const defaultPasswordHint = tenant.phone ? tenant.phone.replace(/\D/g, '').slice(-6) || '123456' : '123456';
+
+    const formHtml = `
+        <p><strong>Username:</strong> ${username}</p>
+        <p><strong>Default Password (last 6 digits of phone):</strong> ${defaultPasswordHint}</p>
+        <div class="form-group">
+            <label class="form-label">Set New Password (optional)</label>
+            <input type="text" class="form-input" id="new-password" placeholder="Leave blank to keep current">
+        </div>
+        <p class="text-muted">The tenant can also log in with their phone number and the password set here.</p>`;
+
+    showFormModal('Tenant Login Credentials', formHtml, async (overlay) => {
+        const newPassword = overlay.querySelector('#new-password').value.trim();
+        if (newPassword) {
+            try {
+                await apiService.put(`/auth/users/${tenant.user_id}`, { password: newPassword });
+                showToast(`Password updated! New password: ${newPassword}`, 'success');
+            } catch (e) {
+                showToast(e.message, 'error');
+                return false;
+            }
         }
     });
 }
