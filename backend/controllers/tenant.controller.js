@@ -32,6 +32,9 @@ const tenantController = {
             const salt = await bcrypt.genSalt(10);
             const password_hash = await bcrypt.hash(defaultPassword, salt);
 
+            // Generate a unique username
+            const autoUsername = full_name.toLowerCase().replace(/\s+/g, '') + '_' + phone.slice(-4);
+
             const { data: user, error: userError } = await supabase
                 .from('users')
                 .insert([{
@@ -39,13 +42,40 @@ const tenantController = {
                     phone,
                     email: email || null,
                     password_hash,
-                    role: 'tenant'
+                    role: 'tenant',
+                    username: autoUsername      // set username
                 }])
                 .select('id')
                 .single();
 
             if (userError) {
-                return ApiResponse.error(res, 'Failed to create tenant user account');
+                // Could be duplicate phone or username – try without username
+                if (userError.code === '23505') {
+                    // If duplicate key, generate username with random suffix
+                    const randomSuffix = Math.random().toString(36).substring(2, 6);
+                    const altUsername = autoUsername + '_' + randomSuffix;
+                    const { data: user2, error: retryError } = await supabase
+                        .from('users')
+                        .insert([{
+                            full_name,
+                            phone,
+                            email: email || null,
+                            password_hash,
+                            role: 'tenant',
+                            username: altUsername
+                        }])
+                        .select('id')
+                        .single();
+                    if (retryError) {
+                        console.error('Tenant user creation retry failed:', retryError);
+                        return ApiResponse.error(res, 'Failed to create tenant user account');
+                    }
+                    user = user2;
+                    autoUsername = altUsername; // update for response
+                } else {
+                    console.error('Tenant user creation error:', userError);
+                    return ApiResponse.error(res, 'Failed to create tenant user account');
+                }
             }
 
             // Create tenant record
@@ -69,6 +99,7 @@ const tenantController = {
             if (error) {
                 // Rollback user creation
                 await supabase.from('users').delete().eq('id', user.id);
+                console.error('Tenant record creation error:', error);
                 return ApiResponse.error(res, 'Failed to create tenant');
             }
 
@@ -88,7 +119,8 @@ const tenantController = {
 
             return ApiResponse.created(res, {
                 tenant,
-                default_password: defaultPassword
+                default_password: defaultPassword,
+                username: autoUsername             // include username in response
             }, 'Tenant registered successfully');
 
         } catch (error) {
