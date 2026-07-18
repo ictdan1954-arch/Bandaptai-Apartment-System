@@ -1,26 +1,29 @@
 import { apiService } from '../../services/api.service.js';
+import { authService } from '../../services/auth.service.js';  // added for role check
 import { formatCurrency, formatDate, capitalize } from '../../utils/formatters.js';
 import { router } from '../../router.js';
 import { showToast } from '../../components/toast.js';
 
 export default async function tenantDetails(container, params) {
-    const id = params.id === 'my' ? null : params.id; // 'my' for tenant viewing own profile
+    const id = params.id === 'my' ? null : params.id;
     container.innerHTML = `<div class="page-loader"><div class="spinner"></div></div>`;
 
     try {
-        // If tenant viewing their own details, get from dashboard or profile
-        let endpoint = id ? `/tenants/${id}` : '/dashboard/tenant';
-        const response = id ? await apiService.get(endpoint) : await apiService.get('/dashboard/tenant');
-        
-        if (!response.success) throw new Error(response.message || 'Not found');
-        
-        const tenant = id ? response.data : response.data.tenant;
-        if (!tenant) {
-            container.innerHTML = `<div class="empty-state"><h3>No tenancy found</h3></div>`;
-            return;
+        let tenant;
+        if (id) {
+            const response = await apiService.get(`/tenants/${id}`);
+            if (!response.success) throw new Error(response.message || 'Tenant not found');
+            tenant = response.data;
+        } else {
+            const response = await apiService.get('/dashboard/tenant');
+            if (!response.success || !response.data.tenant) throw new Error('No tenancy found');
+            tenant = response.data.tenant;
         }
 
-        const paymentsResponse = id ? await apiService.get(`/tenants/${tenant.id}/payments`) : { data: response.data.payment_summary?.recent_payments || [] };
+        // Fetch payments
+        const paymentsResponse = id
+            ? await apiService.get(`/tenants/${tenant.id}/payments`)
+            : { data: [] };
         const payments = paymentsResponse.data || [];
 
         container.innerHTML = `
@@ -60,13 +63,17 @@ export default async function tenantDetails(container, params) {
                     <p><strong>Deposit Paid:</strong> ${formatCurrency(tenant.deposit_paid || 0)}</p>
                     ${tenant.id_number ? `<p><strong>ID Number:</strong> ${tenant.id_number}</p>` : ''}
                 </div>
+                ${tenant.status === 'active' ? `
+                <button class="btn btn-outline mt-2" id="change-unit-btn">
+                    <i class="fas fa-exchange-alt"></i> Change Unit
+                </button>` : ''}
             </div>
 
             <!-- Payments Table -->
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Payment History</h3>
-                    ${id ? `<button class="btn btn-primary btn-sm" onclick="recordPayment('${tenant.id}', '${tenant.unit_id}', '${tenant.units?.apartment_id}')">
+                    ${id ? `<button class="btn btn-primary btn-sm" id="record-payment-btn">
                         <i class="fas fa-plus"></i> Record Payment</button>` : ''}
                 </div>
                 <div class="table-container">
@@ -89,47 +96,114 @@ export default async function tenantDetails(container, params) {
                 </div>
             </div>`;
 
-        // Make recordPayment available globally
-        window.recordPayment = (tenantId, unitId, apartmentId) => {
-            import('../../components/modal.js').then(({ showFormModal }) => {
-                const today = new Date().toISOString().split('T')[0];
-                const formHtml = `
-                    <div class="form-group"><label class="form-label">Amount (KES)</label><input type="number" class="form-input" id="pay-amount" min="1" step="100" required></div>
-                    <div class="form-group"><label class="form-label">Payment Date</label><input type="date" class="form-input" id="pay-date" value="${today}" required></div>
-                    <div class="form-group"><label class="form-label">Period Start</label><input type="date" class="form-input" id="pay-start" value="${today}" required></div>
-                    <div class="form-group"><label class="form-label">Period End</label><input type="date" class="form-input" id="pay-end" required></div>
-                    <div class="form-group"><label class="form-label">Method</label><select class="form-select" id="pay-method">
-                        <option value="cash">Cash</option><option value="mpesa">M-Pesa</option><option value="bank_transfer">Bank Transfer</option><option value="other">Other</option></select></div>
-                    <div class="form-group"><label class="form-label">Reference</label><input type="text" class="form-input" id="pay-ref"></div>
-                `;
-                showFormModal('Record Rent Payment', formHtml, async (overlay) => {
-                    const data = {
-                        tenant_id: tenantId,
-                        unit_id: unitId,
-                        apartment_id: apartmentId,
-                        amount_paid: parseFloat(overlay.querySelector('#pay-amount').value),
-                        payment_date: overlay.querySelector('#pay-date').value,
-                        period_start: overlay.querySelector('#pay-start').value,
-                        period_end: overlay.querySelector('#pay-end').value,
-                        payment_method: overlay.querySelector('#pay-method').value,
-                        reference_number: overlay.querySelector('#pay-ref').value
-                    };
-                    if (!data.amount_paid || !data.payment_date || !data.period_start || !data.period_end) {
-                        showToast('All fields required', 'error');
-                        return false;
-                    }
-                    try {
-                        await apiService.post('/rent', data);
-                        showToast('Payment recorded', 'success');
-                        location.reload();
-                    } catch (e) {
-                        showToast(e.message, 'error');
-                        return false;
-                    }
-                });
+        // Attach event listeners
+        if (tenant.status === 'active') {
+            document.getElementById('change-unit-btn').addEventListener('click', () => openChangeUnitModal(tenant));
+        }
+
+        if (id) {
+            document.getElementById('record-payment-btn')?.addEventListener('click', () => {
+                recordPayment(tenant.id, tenant.unit_id, tenant.units?.apartment_id);
             });
-        };
+        }
+
+        // Record payment function (kept global for the button's onclick, though we could scope it)
+        window.recordPayment = recordPayment;
+
     } catch (error) {
         container.innerHTML = `<div class="error-state"><h2>Error</h2><p>${error.message}</p></div>`;
     }
+}
+
+// Payment recording function (unchanged)
+function recordPayment(tenantId, unitId, apartmentId) {
+    import('../../components/modal.js').then(({ showFormModal }) => {
+        const today = new Date().toISOString().split('T')[0];
+        const formHtml = `
+            <div class="form-group"><label class="form-label">Amount (KES)</label><input type="number" class="form-input" id="pay-amount" min="1" step="100" required></div>
+            <div class="form-group"><label class="form-label">Payment Date</label><input type="date" class="form-input" id="pay-date" value="${today}" required></div>
+            <div class="form-group"><label class="form-label">Period Start</label><input type="date" class="form-input" id="pay-start" value="${today}" required></div>
+            <div class="form-group"><label class="form-label">Period End</label><input type="date" class="form-input" id="pay-end" required></div>
+            <div class="form-group"><label class="form-label">Method</label><select class="form-select" id="pay-method">
+                <option value="cash">Cash</option><option value="mpesa">M-Pesa</option><option value="bank_transfer">Bank Transfer</option><option value="other">Other</option></select></div>
+            <div class="form-group"><label class="form-label">Reference</label><input type="text" class="form-input" id="pay-ref"></div>
+        `;
+        showFormModal('Record Rent Payment', formHtml, async (overlay) => {
+            const data = {
+                tenant_id: tenantId,
+                unit_id: unitId,
+                apartment_id: apartmentId,
+                amount_paid: parseFloat(overlay.querySelector('#pay-amount').value),
+                payment_date: overlay.querySelector('#pay-date').value,
+                period_start: overlay.querySelector('#pay-start').value,
+                period_end: overlay.querySelector('#pay-end').value,
+                payment_method: overlay.querySelector('#pay-method').value,
+                reference_number: overlay.querySelector('#pay-ref').value
+            };
+            if (!data.amount_paid || !data.payment_date || !data.period_start || !data.period_end) {
+                showToast('All fields required', 'error');
+                return false;
+            }
+            try {
+                await apiService.post('/rent', data);
+                showToast('Payment recorded', 'success');
+                location.reload();
+            } catch (e) {
+                showToast(e.message, 'error');
+                return false;
+            }
+        });
+    });
+}
+
+// Change Unit modal
+async function openChangeUnitModal(tenant) {
+    const { showFormModal } = await import('../../components/modal.js');
+
+    // Determine which apartment to fetch units from
+    let apartmentId;
+    if (authService.getRole() === 'caretaker') {
+        const aptRes = await apiService.get('/apartments');
+        if (aptRes.success && aptRes.data.length > 0) {
+            apartmentId = aptRes.data[0].id;
+        }
+    } else {
+        // landlord – use the tenant's current apartment
+        apartmentId = tenant.units?.apartment_id;
+    }
+
+    if (!apartmentId) {
+        showToast('Could not determine apartment', 'error');
+        return;
+    }
+
+    // Fetch vacant units for that apartment
+    const unitsRes = await apiService.get(`/units/apartment/${apartmentId}`);
+    const vacantUnits = unitsRes.success ? unitsRes.data.filter(u => u.status === 'vacant') : [];
+
+    if (vacantUnits.length === 0) {
+        showToast('No vacant units available in this apartment', 'warning');
+        return;
+    }
+
+    const formHtml = `
+        <p>Current unit: <strong>${tenant.units?.unit_number || 'N/A'}</strong></p>
+        <div class="form-group">
+            <label class="form-label">Select New Unit</label>
+            <select class="form-select" id="new-unit">
+                ${vacantUnits.map(u => `<option value="${u.id}">${u.unit_number} - ${capitalize(u.unit_type)} (KES ${u.monthly_rent})</option>`).join('')}
+            </select>
+        </div>`;
+
+    showFormModal('Change Unit', formHtml, async (overlay) => {
+        const newUnitId = overlay.querySelector('#new-unit').value;
+        try {
+            await apiService.put(`/tenants/${tenant.id}`, { unit_id: newUnitId });
+            showToast('Unit changed successfully', 'success');
+            location.reload(); // refresh to reflect changes
+        } catch (e) {
+            showToast(e.message, 'error');
+            return false;
+        }
+    });
 }
