@@ -9,7 +9,7 @@ export default async function rentPayments(container) {
     let defaultAptId = null;
     let defaultAptName = '';
 
-    // Caretaker: fetch their assigned apartment(s)
+    // Caretaker: fetch assigned apartment(s)
     if (role === 'caretaker') {
         const aptRes = await apiService.get('/apartments');
         if (aptRes.success && aptRes.data.length > 0) {
@@ -18,7 +18,6 @@ export default async function rentPayments(container) {
             defaultAptName = apartments[0].name;
         }
     } else {
-        // Landlord: load all apartments for the dropdown
         const aptRes = await apiService.get('/apartments');
         apartments = aptRes.success ? aptRes.data : [];
     }
@@ -70,7 +69,6 @@ export default async function rentPayments(container) {
     endInput.addEventListener('change', loadPayments);
     recordBtn.addEventListener('click', openRecordModal);
 
-    // Initial load
     loadPayments();
 
     async function loadPayments() {
@@ -78,13 +76,11 @@ export default async function rentPayments(container) {
         const start = startInput.value;
         const end = endInput.value;
 
-        // Build query parameters
         let query = '';
         if (apartmentId) query += `apartmentId=${apartmentId}&`;
         if (start) query += `start_date=${start}&`;
         if (end) query += `end_date=${end}&`;
 
-        // For caretaker, use the fixed apartmentId; for landlord, use selected (or 'all')
         const fetchId = (role === 'caretaker') ? defaultAptId : (apartmentId || 'all');
         const endpoint = `/rent/apartment/${fetchId}?${query}`;
 
@@ -100,7 +96,7 @@ export default async function rentPayments(container) {
             paymentsTable.innerHTML = `
                 <table class="table">
                     <thead>
-                        <tr><th>Date</th><th>Tenant</th><th>Unit</th><th>Amount</th><th>Period</th><th>Method</th></tr>
+                        <tr><th>Date</th><th>Tenant</th><th>Unit</th><th>Amount</th><th>Period</th><th>Method</th><th>Purpose</th></tr>
                     </thead>
                     <tbody>
                         ${payments.map(p => `
@@ -111,6 +107,7 @@ export default async function rentPayments(container) {
                                 <td>${formatCurrency(p.amount_paid)}</td>
                                 <td>${formatDate(p.period_start)} - ${formatDate(p.period_end)}</td>
                                 <td>${capitalize(p.payment_method)}</td>
+                                <td>${capitalize(p.purpose || 'monthly_rent')}</td>
                             </tr>`).join('')}
                     </tbody>
                 </table>`;
@@ -119,10 +116,8 @@ export default async function rentPayments(container) {
         }
     }
 
+    // ============ RECORD PAYMENT MODAL ============
     async function openRecordModal() {
-        const { showFormModal } = await import('../../components/modal.js');
-
-        // Fetch active tenants – for caretaker, filter by their apartment(s)
         let tenantsQuery = '?status=active';
         if (role === 'caretaker' && defaultAptId) {
             tenantsQuery += `&apartment_id=${defaultAptId}`;
@@ -136,28 +131,54 @@ export default async function rentPayments(container) {
         }
 
         const today = new Date().toISOString().split('T')[0];
+
         const formHtml = `
             <div class="form-group">
                 <label class="form-label">Tenant</label>
-                <select class="form-select" id="pay-tenant">
-                    ${tenants.map(t => `<option value="${t.id}" data-unit="${t.unit_id}" data-apt="${t.units?.apartment_id}">${t.full_name} - ${t.units?.unit_number || 'No unit'}</option>`).join('')}
+                <select class="form-select" id="pay-tenant" onchange="window.refreshRentDetails()">
+                    ${tenants.map(t => `
+                        <option value="${t.id}" 
+                                data-unit="${t.unit_id}" 
+                                data-apt="${t.units?.apartment_id}" 
+                                data-rent="${t.units?.monthly_rent || 0}" 
+                                data-phone="${t.phone || ''}"
+                                data-unitnumber="${t.units?.unit_number || ''}">
+                            ${t.full_name} - ${t.units?.unit_number || 'No unit'} (${t.phone})
+                        </option>
+                    `).join('')}
                 </select>
+                <div id="arrears-info" class="mt-1" style="font-size:0.9rem; color: var(--danger); display:none;"></div>
             </div>
+
             <div class="form-group">
                 <label class="form-label">Amount (KES)</label>
-                <input type="number" class="form-input" id="pay-amount" min="1" step="100" required>
+                <div style="display:flex; gap:8px;">
+                    <input type="number" class="form-input" id="pay-amount" min="1" step="100" required style="flex:1;">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="window.fillRentAmount()" title="Fill monthly rent">Fill Rent</button>
+                </div>
+                <div id="expected-rent-info" class="mt-1" style="font-size:0.85rem; color: var(--text-secondary); display:none;"></div>
             </div>
+
             <div class="form-group">
                 <label class="form-label">Payment Date</label>
                 <input type="date" class="form-input" id="pay-date" value="${today}" required>
             </div>
             <div class="form-group">
                 <label class="form-label">Period Start</label>
-                <input type="date" class="form-input" id="pay-start" value="${today}" required>
+                <input type="date" class="form-input" id="pay-start" value="${today}" required onchange="window.refreshRentDetails()">
             </div>
             <div class="form-group">
                 <label class="form-label">Period End</label>
-                <input type="date" class="form-input" id="pay-end" required>
+                <input type="date" class="form-input" id="pay-end" required onchange="window.refreshRentDetails()">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Purpose</label>
+                <select class="form-select" id="pay-purpose">
+                    <option value="monthly_rent">Monthly Rent</option>
+                    <option value="arrears_clearance">Arrears Clearance</option>
+                    <option value="deposit_topup">Deposit Top‑up</option>
+                    <option value="other">Other</option>
+                </select>
             </div>
             <div class="form-group">
                 <label class="form-label">Method</label>
@@ -171,7 +192,99 @@ export default async function rentPayments(container) {
             <div class="form-group">
                 <label class="form-label">Reference</label>
                 <input type="text" class="form-input" id="pay-ref">
-            </div>`;
+            </div>
+
+            <!-- Last 3 Payments -->
+            <div class="mt-3" id="last-payments-section" style="display:none;">
+                <h4 style="font-size:0.9rem; margin-bottom:8px;">Last 3 Payments</h4>
+                <div class="table-container" style="max-height:150px; overflow-y:auto;">
+                    <table class="table" style="font-size:0.85rem;">
+                        <thead><tr><th>Date</th><th>Amount</th><th>Period</th><th>Purpose</th></tr></thead>
+                        <tbody id="last-payments-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const { showFormModal } = await import('../../components/modal.js');
+
+        // Global helpers used by inline handlers
+        window.refreshRentDetails = async function () {
+            const tenantSelect = document.querySelector('#pay-tenant');
+            const arrearsDiv = document.querySelector('#arrears-info');
+            const expectedDiv = document.querySelector('#expected-rent-info');
+            const lastPaymentsSection = document.querySelector('#last-payments-section');
+            const lastPaymentsTbody = document.querySelector('#last-payments-tbody');
+            const startInput = document.querySelector('#pay-start');
+            const endInput = document.querySelector('#pay-end');
+
+            if (!tenantSelect) return;
+
+            const selectedOption = tenantSelect.options[tenantSelect.selectedIndex];
+            const tenantId = selectedOption?.value;
+            const rent = parseFloat(selectedOption?.dataset.rent) || 0;
+
+            // Arrears
+            arrearsDiv.style.display = 'none';
+            if (tenantId) {
+                try {
+                    const res = await apiService.get(`/rent/arrears/${tenantId}`);
+                    if (res.success) {
+                        const arrears = res.data.arrears;
+                        if (arrears > 0) {
+                            arrearsDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Arrears: <strong>${formatCurrency(arrears)}</strong>`;
+                            arrearsDiv.style.color = 'var(--danger)';
+                        } else {
+                            arrearsDiv.innerHTML = `<i class="fas fa-check-circle"></i> No arrears`;
+                            arrearsDiv.style.color = 'var(--secondary)';
+                        }
+                        arrearsDiv.style.display = 'block';
+                    }
+                } catch (e) {}
+
+                // Last 3 Payments
+                try {
+                    const payRes = await apiService.get(`/tenants/${tenantId}/payments`);
+                    if (payRes.success && payRes.data.length > 0) {
+                        const lastThree = payRes.data.slice(0, 3);
+                        lastPaymentsTbody.innerHTML = lastThree.map(p => `
+                            <tr>
+                                <td>${formatDate(p.payment_date)}</td>
+                                <td>${formatCurrency(p.amount_paid)}</td>
+                                <td>${formatDate(p.period_start)} - ${formatDate(p.period_end)}</td>
+                                <td>${capitalize(p.purpose || 'monthly_rent')}</td>
+                            </tr>
+                        `).join('');
+                        lastPaymentsSection.style.display = 'block';
+                    } else {
+                        lastPaymentsSection.style.display = 'none';
+                    }
+                } catch (e) { lastPaymentsSection.style.display = 'none'; }
+            }
+
+            // Expected rent for period
+            expectedDiv.style.display = 'none';
+            if (rent > 0 && startInput.value && endInput.value) {
+                const start = new Date(startInput.value);
+                const end = new Date(endInput.value);
+                const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+                const expectedTotal = monthsDiff * rent;
+                expectedDiv.innerHTML = `Expected rent for ${monthsDiff} month${monthsDiff>1?'s':''}: <strong>${formatCurrency(expectedTotal)}</strong>`;
+                expectedDiv.style.display = 'block';
+            } else if (rent > 0) {
+                expectedDiv.innerHTML = `Monthly rent: <strong>${formatCurrency(rent)}</strong>`;
+                expectedDiv.style.display = 'block';
+            }
+        };
+
+        window.fillRentAmount = function () {
+            const tenantSelect = document.querySelector('#pay-tenant');
+            const amountInput = document.querySelector('#pay-amount');
+            if (!tenantSelect || !amountInput) return;
+            const selectedOption = tenantSelect.options[tenantSelect.selectedIndex];
+            const rent = parseFloat(selectedOption?.dataset.rent) || 0;
+            if (rent > 0) amountInput.value = rent;
+        };
 
         showFormModal('Record Payment', formHtml, async (overlay) => {
             const tenantSelect = overlay.querySelector('#pay-tenant');
@@ -185,7 +298,8 @@ export default async function rentPayments(container) {
                 period_start: overlay.querySelector('#pay-start').value,
                 period_end: overlay.querySelector('#pay-end').value,
                 payment_method: overlay.querySelector('#pay-method').value,
-                reference_number: overlay.querySelector('#pay-ref').value
+                reference_number: overlay.querySelector('#pay-ref').value,
+                purpose: overlay.querySelector('#pay-purpose').value
             };
 
             if (!data.tenant_id || !data.amount_paid || !data.payment_date || !data.period_start || !data.period_end) {
@@ -197,10 +311,19 @@ export default async function rentPayments(container) {
                 await apiService.post('/rent', data);
                 showToast('Payment recorded', 'success');
                 loadPayments();
+
+                // Clean up global helpers
+                delete window.refreshRentDetails;
+                delete window.fillRentAmount;
             } catch (e) {
                 showToast(e.message, 'error');
                 return false;
             }
         });
+
+        // Trigger initial data load after modal renders
+        setTimeout(() => {
+            if (window.refreshRentDetails) window.refreshRentDetails();
+        }, 100);
     }
 }
