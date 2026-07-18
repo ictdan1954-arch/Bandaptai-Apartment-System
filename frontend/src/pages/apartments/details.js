@@ -155,7 +155,6 @@ async function loadCaretakers(apartmentId) {
 }
 
 async function openAssignCaretaker(apartmentId) {
-    // Fetch all caretaker users
     const usersRes = await apiService.get('/auth/users?role=caretaker');
     if (!usersRes.success) {
         showToast('Failed to load caretakers', 'error');
@@ -199,7 +198,16 @@ async function editCaretakerAccount(userId, currentName, apartmentId) {
         </div>
         <div class="form-group">
             <label class="form-label">New Password (leave blank to keep current)</label>
-            <input type="password" class="form-input" id="edit-user-password" placeholder="Min 6 characters">
+            <div style="position: relative;">
+                <input type="password" class="form-input" id="edit-user-password" placeholder="Min 6 characters" style="padding-right: 40px;">
+                <button type="button" class="password-toggle" 
+                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px 8px;"
+                        onclick="const pwd = document.getElementById('edit-user-password'); 
+                                 if(pwd.type === 'password') { pwd.type = 'text'; this.innerHTML = '<i class=\\'fas fa-eye-slash\\'></i>'; } 
+                                 else { pwd.type = 'password'; this.innerHTML = '<i class=\\'fas fa-eye\\'></i>'; }">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
         </div>
         <p class="text-muted">Leave password empty if you only want to change the name.</p>`;
 
