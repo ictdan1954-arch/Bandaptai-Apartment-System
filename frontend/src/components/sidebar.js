@@ -1,12 +1,51 @@
 import { authService } from '../services/auth.service.js';
+import { apiService } from '../services/api.service.js'; // added
 import { router } from '../router.js';
 
-export function setupSidebar() {
+export async function setupSidebar() {
     const nav = document.getElementById('sidebar-nav');
     const role = authService.getRole();
 
     const menuItems = getMenuItems(role);
     renderNav(nav, menuItems);
+
+    // If caretaker, replace generic "My Apartments" with actual assigned apartments
+    if (role === 'caretaker') {
+        try {
+            const response = await apiService.get('/apartments');
+            if (response.success && response.data.length > 0) {
+                const apartments = response.data;
+                const apartmentsHtml = apartments.map(a => `
+                    <a class="nav-link" href="#/apartments/${a.id}" data-href="/apartments/${a.id}">
+                        <i class="fas fa-building"></i>
+                        <span class="nav-text">${a.name}</span>
+                    </a>
+                `).join('');
+
+                // Find the "PROPERTIES" section and replace its links
+                const sections = nav.querySelectorAll('.nav-section');
+                sections.forEach(section => {
+                    const titleEl = section.querySelector('.nav-section-title');
+                    if (titleEl && titleEl.textContent === 'PROPERTIES') {
+                        // Clear existing links
+                        const existingLinks = section.querySelectorAll('.nav-link');
+                        existingLinks.forEach(link => link.remove());
+                        // Insert apartment links
+                        section.insertAdjacentHTML('beforeend', apartmentsHtml);
+                    }
+                });
+
+                // Re-attach click handlers to all links (including new ones)
+                nav.querySelectorAll('.nav-link').forEach(link => {
+                    link.addEventListener('click', () => {
+                        document.getElementById('sidebar').classList.remove('open');
+                    });
+                });
+            }
+        } catch (e) {
+            // leave default "My Apartments" if fetch fails
+        }
+    }
 
     // Highlight active link
     updateActiveLink();
@@ -42,8 +81,7 @@ function getMenuItems(role) {
             { icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' },
         ]},
         { section: 'PROPERTIES', items: [
-            { icon: 'fa-building', text: 'My Apartments', href: '/apartments' },
-            { icon: 'fa-door-open', text: 'Units', href: '/units/all' },
+            { icon: 'fa-building', text: 'My Apartments', href: '/apartments' }, // fallback, will be replaced
         ]},
         { section: 'PEOPLE', items: [
             { icon: 'fa-users', text: 'Tenants', href: '/tenants' },
@@ -91,10 +129,9 @@ function renderNav(container, menuItems) {
     });
     container.innerHTML = html;
 
-    // Add click handlers
+    // Add click handlers (for mobile close)
     container.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
-            // Mobile: close sidebar after click
             document.getElementById('sidebar').classList.remove('open');
         });
     });
