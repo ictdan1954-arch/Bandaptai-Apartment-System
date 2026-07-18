@@ -1,37 +1,39 @@
 import { apiService } from '../../services/api.service.js';
 import { authService } from '../../services/auth.service.js';
-import { Modal, showFormModal } from '../../components/modal.js';
+import { showFormModal } from '../../components/modal.js';
 import { showToast } from '../../components/toast.js';
 import { formatDate } from '../../utils/formatters.js';
-import { router } from '../../router.js';
 
 export default async function apartmentsList(container) {
     container.innerHTML = `
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">Apartments</h3>
-                ${authService.getRole() === 'landlord' ? '<button class="btn btn-primary" id="add-apartment-btn"><i class="fas fa-plus"></i> Add Apartment</button>' : ''}
+                ${authService.getRole() === 'landlord'
+                    ? '<button class="btn btn-primary" id="add-apartment-btn"><i class="fas fa-plus"></i> Add Apartment</button>'
+                    : ''}
             </div>
             <div id="apartments-table" class="table-container">
                 <div class="page-loader"><div class="spinner"></div></div>
             </div>
         </div>`;
 
-    await loadApartments();
-
     if (authService.getRole() === 'landlord') {
         document.getElementById('add-apartment-btn')?.addEventListener('click', openAddModal);
     }
+
+    await loadApartments();
 }
 
 async function loadApartments() {
     try {
         const response = await apiService.get('/apartments');
         if (!response.success) throw new Error(response.message);
-        
+
         const apartments = response.data;
         const tableContainer = document.getElementById('apartments-table');
-        
+        const role = authService.getRole();
+
         if (apartments.length === 0) {
             tableContainer.innerHTML = `
                 <div class="empty-state">
@@ -56,7 +58,11 @@ async function loadApartments() {
                 <tbody>
                     ${apartments.map(a => `
                         <tr>
-                            <td><strong>${a.name}</strong></td>
+                            <td>
+                                <a href="#/apartments/${a.id}" style="color: var(--primary); font-weight: 600; cursor: pointer;">
+                                    ${a.name}
+                                </a>
+                            </td>
                             <td>${a.location}</td>
                             <td><span class="badge badge-${a.status === 'active' ? 'success' : 'secondary'}">${a.status}</span></td>
                             <td>${formatDate(a.created_at)}</td>
@@ -64,18 +70,20 @@ async function loadApartments() {
                                 <div class="table-actions">
                                     <button onclick="window.router.navigate('/apartments/${a.id}')" title="View"><i class="fas fa-eye"></i></button>
                                     <button onclick="window.router.navigate('/units/${a.id}')" title="Units"><i class="fas fa-door-open"></i></button>
-                                    ${authService.getRole() === 'landlord' ? `
-                                    <button onclick="editApartment('${a.id}')" title="Edit"><i class="fas fa-edit"></i></button>
-                                    <button class="danger" onclick="deleteApartment('${a.id}')" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
+                                    ${role === 'landlord' ? `
+                                    <button onclick="window.editApartment('${a.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                                    <button class="danger" onclick="window.deleteApartment('${a.id}')" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
                                 </div>
                             </td>
                         </tr>`).join('')}
                 </tbody>
             </table>`;
 
-        // Attach global functions
-        window.editApartment = editApartment;
-        window.deleteApartment = deleteApartment;
+        // Expose global functions for inline onclick (landlord only)
+        if (role === 'landlord') {
+            window.editApartment = editApartment;
+            window.deleteApartment = deleteApartment;
+        }
     } catch (error) {
         document.getElementById('apartments-table').innerHTML = `
             <div class="error-state">
@@ -101,13 +109,13 @@ function openAddModal() {
         </div>`;
 
     showFormModal('Add Apartment', formHtml, async (overlay) => {
-        const name = overlay.querySelector('#apart-name').value;
-        const location = overlay.querySelector('#apart-location').value;
-        const description = overlay.querySelector('#apart-desc').value;
+        const name = overlay.querySelector('#apart-name').value.trim();
+        const location = overlay.querySelector('#apart-location').value.trim();
+        const description = overlay.querySelector('#apart-desc').value.trim();
 
         if (!name || !location) {
             showToast('Name and location are required', 'error');
-            return false; // don't close modal
+            return false;
         }
 
         try {
@@ -150,9 +158,9 @@ async function editApartment(id) {
 
         showFormModal('Edit Apartment', formHtml, async (overlay) => {
             const updates = {
-                name: overlay.querySelector('#edit-name').value,
-                location: overlay.querySelector('#edit-location').value,
-                description: overlay.querySelector('#edit-desc').value,
+                name: overlay.querySelector('#edit-name').value.trim(),
+                location: overlay.querySelector('#edit-location').value.trim(),
+                description: overlay.querySelector('#edit-desc').value.trim(),
                 status: overlay.querySelector('#edit-status').value
             };
             await apiService.put(`/apartments/${id}`, updates);
