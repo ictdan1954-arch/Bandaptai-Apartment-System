@@ -231,8 +231,8 @@ const dashboardController = {
                     full_name: tenant.full_name,
                     unit_number: tenant.units?.unit_number,
                     monthly_rent: tenant.units?.monthly_rent,
-                    unit_id: tenant.unit_id,                    // ← now included
-                    apartment_id: tenant.units?.apartment_id,   // ← now included
+                    unit_id: tenant.unit_id,
+                    apartment_id: tenant.units?.apartment_id,
                     lease_start_date: tenant.lease_start_date,
                     lease_end_date: tenant.lease_end_date
                 },
@@ -246,6 +246,64 @@ const dashboardController = {
             });
         } catch (error) {
             return ApiResponse.error(res, 'Failed to load dashboard');
+        }
+    },
+
+    // Staff dashboard
+    async staffDashboard(req, res) {
+        try {
+            // Get user's phone to find their staff record
+            const { data: user } = await supabase
+                .from('users')
+                .select('phone')
+                .eq('id', req.user.id)
+                .single();
+
+            if (!user) return ApiResponse.notFound(res, 'User not found');
+
+            const { data: staff } = await supabase
+                .from('staff_members')
+                .select('*, staff_roles:staff_role_id(role_name), apartments:apartment_id(id, name)')
+                .eq('phone', user.phone)
+                .eq('status', 'active')
+                .single();
+
+            if (!staff) {
+                return ApiResponse.success(res, { message: 'No active staff profile found' });
+            }
+
+            // Recent salary payments (last 5)
+            const { data: salaries } = await supabase
+                .from('staff_salaries')
+                .select('*')
+                .eq('staff_id', staff.id)
+                .order('payment_date', { ascending: false })
+                .limit(5);
+
+            // Assigned maintenance tasks
+            const { data: tasks } = await supabase
+                .from('maintenance_requests')
+                .select('*, units:unit_id(unit_number)')
+                .eq('assigned_staff_id', staff.id)
+                .neq('status', 'resolved')
+                .order('created_at', { ascending: false });
+
+            // Announcements for the staff's apartment
+            const { data: announcements } = await supabase
+                .from('announcements')
+                .select('*')
+                .eq('apartment_id', staff.apartment_id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            return ApiResponse.success(res, {
+                staff,
+                salaries: salaries || [],
+                tasks: tasks || [],
+                announcements: announcements || []
+            });
+        } catch (error) {
+            return ApiResponse.error(res, 'Failed to load staff dashboard');
         }
     }
 };
