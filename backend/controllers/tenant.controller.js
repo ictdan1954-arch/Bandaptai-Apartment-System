@@ -167,7 +167,7 @@ const tenantController = {
         }
     },
 
-    // Get single tenant
+    // Get single tenant – now includes username from linked user
     async getById(req, res) {
         try {
             const { id } = req.params;
@@ -176,7 +176,8 @@ const tenantController = {
                 .from('tenants')
                 .select(`
                     *,
-                    units:unit_id(*, apartments:apartment_id(*))
+                    units:unit_id(*, apartments:apartment_id(*)),
+                    user:user_id(username)
                 `)
                 .eq('id', id)
                 .single();
