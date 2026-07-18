@@ -8,7 +8,7 @@ const authController = {
     // Register new user (Landlord creates caretakers, Caretaker creates tenants)
     async register(req, res) {
         try {
-            const { full_name, email, phone, password, role } = req.body;
+            const { full_name, email, phone, password, role, username } = req.body;
 
             // Validate required fields
             const missing = validateRequired(req.body, ['full_name', 'phone', 'password', 'role']);
@@ -37,15 +37,23 @@ const authController = {
                 return ApiResponse.badRequest(res, passwordError);
             }
 
-            // Check if user exists
+            // Validate username if provided
+            if (username) {
+                const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+                if (!usernameRegex.test(username)) {
+                    return ApiResponse.badRequest(res, 'Username must be 3-30 characters and contain only letters, numbers, and underscores');
+                }
+            }
+
+            // Check if user exists (by phone, email, or username)
             const { data: existingUser } = await supabase
                 .from('users')
                 .select('id')
-                .or(`phone.eq.${phone}${email ? `,email.eq.${email}` : ''}`)
+                .or(`phone.eq.${phone}${email ? `,email.eq.${email}` : ''}${username ? `,username.eq.${username}` : ''}`)
                 .maybeSingle();
 
             if (existingUser) {
-                return ApiResponse.badRequest(res, 'User with this phone or email already exists');
+                return ApiResponse.badRequest(res, 'User with this phone, email, or username already exists');
             }
 
             // Hash password
@@ -61,10 +69,11 @@ const authController = {
                         email: email || null,
                         phone,
                         password_hash,
-                        role
+                        role,
+                        username: username || null
                     }
                 ])
-                .select('id, full_name, email, phone, role, created_at')
+                .select('id, full_name, email, phone, role, username, created_at')
                 .single();
 
             if (error) {
@@ -72,7 +81,7 @@ const authController = {
                 return ApiResponse.error(res, 'Failed to create user');
             }
 
-            // Generate token
+            // Generate token (optional, usually not needed for admin-created accounts)
             const token = generateToken(newUser);
 
             return ApiResponse.created(res, {
@@ -86,21 +95,25 @@ const authController = {
         }
     },
 
-    // Login
+    // Login – accepts username, email, or phone
     async login(req, res) {
         try {
-            const { phone, password } = req.body;
+            const { phone, password } = req.body; // "phone" field is used for any identifier
+            const identifier = phone?.trim();
 
             const missing = validateRequired(req.body, ['phone', 'password']);
             if (missing.length > 0) {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
             }
 
-            // Find user by phone or email
+            // Sanitize identifier to prevent filter injection
+            const safeIdentifier = identifier.replace(/'/g, "''");
+
+            // Find user by username, email, or phone
             const { data: user, error } = await supabase
                 .from('users')
                 .select('*')
-                .or(`phone.eq.${phone},email.eq.${phone}`)
+                .or(`phone.eq.${safeIdentifier},email.eq.${safeIdentifier},username.eq.${safeIdentifier}`)
                 .eq('is_active', true)
                 .maybeSingle();
 
@@ -142,7 +155,7 @@ const authController = {
         try {
             const { data: user, error } = await supabase
                 .from('users')
-                .select('id, full_name, email, phone, role, profile_photo, is_active, last_login, created_at')
+                .select('id, full_name, email, phone, username, role, profile_photo, is_active, last_login, created_at')
                 .eq('id', req.user.id)
                 .single();
 
@@ -163,7 +176,7 @@ const authController = {
 
             let query = supabase
                 .from('users')
-                .select('id, full_name, email, phone, role, profile_photo, is_active, last_login, created_at');
+                .select('id, full_name, email, phone, username, role, profile_photo, is_active, last_login, created_at');
 
             if (role) {
                 query = query.eq('role', role);
@@ -183,7 +196,7 @@ const authController = {
     async updateUser(req, res) {
         try {
             const { userId } = req.params;
-            const { full_name, password } = req.body;
+            const { full_name, password, username } = req.body;
 
             // Only landlord can update other users
             if (req.user.role !== 'landlord') {
@@ -192,6 +205,23 @@ const authController = {
 
             const updateData = {};
             if (full_name) updateData.full_name = full_name;
+            if (username) {
+                const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+                if (!usernameRegex.test(username)) {
+                    return ApiResponse.badRequest(res, 'Username must be 3-30 characters and contain only letters, numbers, and underscores');
+                }
+                // Check uniqueness
+                const { data: existing } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('username', username)
+                    .neq('id', userId)
+                    .maybeSingle();
+                if (existing) {
+                    return ApiResponse.badRequest(res, 'Username already taken');
+                }
+                updateData.username = username;
+            }
             if (password) {
                 const passwordError = validatePassword(password);
                 if (passwordError) {
@@ -209,7 +239,7 @@ const authController = {
                 .from('users')
                 .update(updateData)
                 .eq('id', userId)
-                .select('id, full_name, email, phone, role')
+                .select('id, full_name, email, phone, username, role')
                 .single();
 
             if (error) {
