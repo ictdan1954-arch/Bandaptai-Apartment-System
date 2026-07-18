@@ -35,7 +35,7 @@ const expenseController = {
         }
     },
 
-    // Get expenses for an apartment
+    // Get expenses for an apartment (or all for landlord)
     async getByApartment(req, res) {
         try {
             const { apartmentId } = req.params;
@@ -46,8 +46,26 @@ const expenseController = {
                 .select(`
                     *,
                     recorded_by_user:recorded_by(id, full_name)
-                `)
-                .eq('apartment_id', apartmentId);
+                `);
+
+            // Handle 'all' – landlord sees everything, caretaker sees assigned apartments
+            if (apartmentId !== 'all') {
+                query = query.eq('apartment_id', apartmentId);
+            } else {
+                if (req.user.role === 'caretaker') {
+                    const { data: assignments } = await supabase
+                        .from('caretaker_assignments')
+                        .select('apartment_id')
+                        .eq('user_id', req.user.id)
+                        .eq('is_active', true);
+                    const apartmentIds = assignments?.map(a => a.apartment_id) || [];
+                    if (apartmentIds.length === 0) {
+                        return ApiResponse.success(res, []);
+                    }
+                    query = query.in('apartment_id', apartmentIds);
+                }
+                // landlord sees all – no filter needed
+            }
 
             if (category) query = query.eq('category', category);
             if (start_date) query = query.gte('expense_date', start_date);
