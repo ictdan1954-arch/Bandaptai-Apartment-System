@@ -82,7 +82,6 @@ export default async function apartmentDetails(container, params) {
             </div>` : ''}
         `;
 
-        // Load caretakers if landlord
         if (userRole === 'landlord') {
             loadCaretakers(id);
             document.getElementById('assign-caretaker-btn').addEventListener('click', () => openAssignCaretaker(id));
@@ -117,6 +116,7 @@ async function loadCaretakers(apartmentId) {
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Username</th>
                         <th>Phone</th>
                         <th>Email</th>
                         <th>Assigned Date</th>
@@ -127,12 +127,13 @@ async function loadCaretakers(apartmentId) {
                     ${caretakers.map(c => `
                         <tr>
                             <td>${c.users?.full_name || 'N/A'}</td>
+                            <td>${c.users?.username || '-'}</td>
                             <td>${c.users?.phone || 'N/A'}</td>
                             <td>${c.users?.email || '-'}</td>
                             <td>${formatDate(c.assigned_at)}</td>
                             <td>
                                 <div class="table-actions">
-                                    <button onclick="window.editCaretakerAccount('${c.users?.id}', '${c.users?.full_name}', '${apartmentId}')" title="Edit Account">
+                                    <button onclick="window.editCaretakerAccount('${c.users?.id}', '${c.users?.full_name}', '${c.users?.username || ''}', '${apartmentId}')" title="Edit Account">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="danger" onclick="window.removeCaretaker('${c.id}')" title="Remove">
@@ -145,8 +146,7 @@ async function loadCaretakers(apartmentId) {
                 </tbody>
             </table>`;
 
-        // Attach global functions
-        window.editCaretakerAccount = (userId, currentName, aptId) => editCaretakerAccount(userId, currentName, aptId);
+        window.editCaretakerAccount = (userId, currentName, currentUsername, aptId) => editCaretakerAccount(userId, currentName, currentUsername, aptId);
         window.removeCaretaker = (assignmentId) => removeCaretakerHandler(assignmentId, apartmentId);
     } catch (error) {
         document.getElementById('caretakers-list').innerHTML = `
@@ -171,7 +171,7 @@ async function openAssignCaretaker(apartmentId) {
         <div class="form-group">
             <label class="form-label">Select Caretaker</label>
             <select class="form-select" id="caretaker-select">
-                ${caretakers.map(u => `<option value="${u.id}">${u.full_name} (${u.phone})</option>`).join('')}
+                ${caretakers.map(u => `<option value="${u.id}">${u.full_name} (${u.username || u.phone})</option>`).join('')}
             </select>
         </div>`;
 
@@ -189,9 +189,13 @@ async function openAssignCaretaker(apartmentId) {
     });
 }
 
-async function editCaretakerAccount(userId, currentName, apartmentId) {
+async function editCaretakerAccount(userId, currentName, currentUsername, apartmentId) {
     const { showFormModal } = await import('../../components/modal.js');
     const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="edit-user-username" value="${currentUsername}" placeholder="Enter username">
+        </div>
         <div class="form-group">
             <label class="form-label">Full Name</label>
             <input type="text" class="form-input" id="edit-user-name" value="${currentName}">
@@ -209,9 +213,10 @@ async function editCaretakerAccount(userId, currentName, apartmentId) {
                 </button>
             </div>
         </div>
-        <p class="text-muted">Leave password empty if you only want to change the name.</p>`;
+        <p class="text-muted">Leave password empty if you only want to change the name/username.</p>`;
 
     showFormModal('Edit Caretaker Account', formHtml, async (overlay) => {
+        const username = overlay.querySelector('#edit-user-username').value.trim();
         const full_name = overlay.querySelector('#edit-user-name').value.trim();
         const password = overlay.querySelector('#edit-user-password').value.trim();
 
@@ -221,6 +226,7 @@ async function editCaretakerAccount(userId, currentName, apartmentId) {
         }
 
         const body = { full_name };
+        if (username) body.username = username;
         if (password) {
             if (password.length < 6) {
                 showToast('Password must be at least 6 characters', 'error');
