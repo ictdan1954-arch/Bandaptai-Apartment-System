@@ -17,21 +17,23 @@ export default async function tenantMaintenance(container) {
             </div>
         </div>`;
 
-    document.getElementById('new-request-btn').addEventListener('click', openNewRequest);
+    const newRequestBtn = container.querySelector('#new-request-btn');
+    const myRequestsTable = container.querySelector('#my-requests');
+
+    newRequestBtn.addEventListener('click', openNewRequest);
     await loadMyRequests();
 
     async function loadMyRequests() {
         try {
             const response = await apiService.get('/maintenance/my-requests');
             const requests = response.success ? response.data : [];
-            const table = document.getElementById('my-requests');
 
             if (requests.length === 0) {
-                table.innerHTML = `<div class="empty-state"><i class="fas fa-tools"></i><h3>No requests</h3><p>Submit a maintenance request when needed.</p></div>`;
+                myRequestsTable.innerHTML = `<div class="empty-state"><i class="fas fa-tools"></i><h3>No requests</h3><p>Submit a maintenance request when needed.</p></div>`;
                 return;
             }
 
-            table.innerHTML = `
+            myRequestsTable.innerHTML = `
                 <table class="table">
                     <thead>
                         <tr>
@@ -63,7 +65,7 @@ export default async function tenantMaintenance(container) {
                 </table>`;
 
             // Event delegation for view button
-            table.addEventListener('click', (e) => {
+            myRequestsTable.addEventListener('click', (e) => {
                 const viewBtn = e.target.closest('.view-btn');
                 if (viewBtn) {
                     openViewModal(viewBtn.dataset.id);
@@ -71,7 +73,7 @@ export default async function tenantMaintenance(container) {
             });
 
         } catch (e) {
-            document.getElementById('my-requests').innerHTML = `<div class="error-state"><p>${e.message}</p></div>`;
+            myRequestsTable.innerHTML = `<div class="error-state"><p>${e.message}</p></div>`;
         }
     }
 
@@ -81,7 +83,6 @@ export default async function tenantMaintenance(container) {
             if (!res.success) throw new Error('Request not found');
             const r = res.data;
 
-            // Build comments HTML
             let commentsHtml = '';
             if (r.comments && r.comments.length > 0) {
                 commentsHtml = r.comments.map(c => `
@@ -119,7 +120,7 @@ export default async function tenantMaintenance(container) {
                     try {
                         await apiService.post(`/maintenance/${requestId}/comments`, { comment });
                         showToast('Comment added', 'success');
-                        loadMyRequests(); // refresh list
+                        loadMyRequests();
                     } catch (e) {
                         showToast(e.message, 'error');
                         return false;
