@@ -2,6 +2,7 @@ import { apiService } from '../../services/api.service.js';
 import { authService } from '../../services/auth.service.js';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
 import { router } from '../../router.js';
+import { renderStaffDashboard } from './staff.js';
 
 export default async function dashboardPage(container) {
     const role = authService.getRole();
@@ -14,14 +15,20 @@ export default async function dashboardPage(container) {
             data = await apiService.get('/dashboard/landlord');
         } else if (role === 'caretaker') {
             data = await apiService.get('/dashboard/caretaker');
-        } else {
+        } else if (role === 'tenant') {
             data = await apiService.get('/dashboard/tenant');
+        } else if (role === 'staff') {
+            data = await apiService.get('/dashboard/staff');
+        } else {
+            throw new Error('Unknown role');
         }
 
         if (!data.success) throw new Error(data.message);
 
         if (role === 'tenant') {
             renderTenantDashboard(container, data.data);
+        } else if (role === 'staff') {
+            renderStaffDashboard(container, data.data);
         } else {
             renderAdminDashboard(container, data.data, role);
         }
