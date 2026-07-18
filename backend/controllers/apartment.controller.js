@@ -202,14 +202,14 @@ const apartmentController = {
         }
     },
 
-    // Get apartment caretakers
+    // Get apartment caretakers – now includes username
     async getCaretakers(req, res) {
         try {
             const { apartmentId } = req.params;
 
             const { data, error } = await supabase
                 .from('caretaker_assignments')
-                .select('*, users(id, full_name, phone, email)')
+                .select('*, users(id, full_name, phone, email, username)')
                 .eq('apartment_id', apartmentId)
                 .eq('is_active', true);
 
