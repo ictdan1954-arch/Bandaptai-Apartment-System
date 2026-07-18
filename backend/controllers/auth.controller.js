@@ -5,7 +5,7 @@ const ApiResponse = require('../utils/response');
 const { validateRequired, validatePhone, validatePassword } = require('../utils/validators');
 
 const authController = {
-    // Register new user (Landlord creates caretakers, Caretaker creates tenants)
+    // Register new user (Landlord creates caretakers/staff, Caretaker creates tenants)
     async register(req, res) {
         try {
             const { full_name, email, phone, password, role, username } = req.body;
@@ -16,8 +16,8 @@ const authController = {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
             }
 
-            // Validate role
-            if (!['landlord', 'caretaker', 'tenant'].includes(role)) {
+            // Validate role - now includes 'staff'
+            if (!['landlord', 'caretaker', 'tenant', 'staff'].includes(role)) {
                 return ApiResponse.badRequest(res, 'Invalid role');
             }
 
