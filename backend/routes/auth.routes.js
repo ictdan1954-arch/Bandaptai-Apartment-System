@@ -29,6 +29,6 @@ router.post('/setup', async (req, res) => {
 // Protected routes
 router.get('/profile', authenticate, authController.getProfile);
 router.get('/users', authenticate, authorize('landlord'), authController.getAllUsers);
-router.put('/users/:userId', authenticate, authorize('landlord'), authController.updateUser);
+router.put('/users/:userId', authenticate, authorize('landlord', 'caretaker'), authController.updateUser);
 
 module.exports = router;
