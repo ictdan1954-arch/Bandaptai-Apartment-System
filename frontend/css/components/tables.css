@@ -1,143 +1,231 @@
 /* =============================================
-   TABLES
+   TABLES - ESTATE CALM
+   Scannable, warm, and beautifully organized.
    ============================================= */
+
+/* ----- Table Container (The outer shell) ----- */
 .table-container {
     overflow-x: auto;
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-normal);
 }
 
+.table-container:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* ----- The Table Itself ----- */
 .table {
     width: 100%;
     border-collapse: collapse;
 }
 
+/* --- Table Headers (Crisp & organized) --- */
 .table th {
-    padding: 14px 16px;
+    padding: 16px 20px;
     text-align: left;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     background: var(--bg-input);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
 
+/* --- Table Cells --- */
 .table td {
-    padding: 14px 16px;
+    padding: 16px 20px;
     font-size: 0.9rem;
     color: var(--text-primary);
     border-bottom: 1px solid var(--border-light);
     vertical-align: middle;
-}
-
-.table tbody tr {
     transition: background var(--transition-fast);
 }
 
-.table tbody tr:hover {
-    background: var(--bg-input);
+/* --- Table Rows (Interactive & warm) --- */
+.table tbody tr {
+    transition: all var(--transition-fast);
 }
 
+.table tbody tr:hover {
+    background: var(--primary-bg); /* Warm peach glow instead of cold grey */
+    cursor: default;
+}
+
+/* Remove bottom border on the very last row for cleanliness */
 .table tbody tr:last-child td {
     border-bottom: none;
 }
 
+/* --- Action Buttons inside tables (Edit/Delete/View) --- */
 .table-actions {
     display: flex;
     gap: 8px;
+    align-items: center;
 }
 
 .table-actions button {
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-md);
-    background: var(--bg-input);
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition-fast);
-}
-
-.table-actions button:hover {
-    background: var(--primary-bg);
-    color: var(--primary);
-}
-
-.table-actions button.danger:hover {
-    background: var(--danger-bg);
-    color: var(--danger);
-}
-
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 48px 24px;
-    color: var(--text-secondary);
-}
-
-.empty-state i {
-    font-size: 3rem;
-    color: var(--text-muted);
-    margin-bottom: 16px;
-}
-
-.empty-state h3 {
-    font-size: 1.1rem;
-    margin-bottom: 8px;
-}
-
-.empty-state p {
-    font-size: 0.9rem;
-    margin-bottom: 20px;
-}
-
-/* Pagination */
-.pagination {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px;
-    border-top: 1px solid var(--border);
-}
-
-.pagination-info {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.pagination-buttons {
-    display: flex;
-    gap: 8px;
-}
-
-.pagination-btn {
     width: 36px;
     height: 36px;
     border-radius: var(--radius-md);
     background: var(--bg-input);
     color: var(--text-secondary);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     transition: all var(--transition-fast);
+    border: 1px solid transparent;
+    font-size: 0.95rem;
 }
 
-.pagination-btn:hover:not(:disabled) {
-    background: var(--primary);
-    color: white;
+.table-actions button:hover {
+    background: var(--primary-bg);
+    color: var(--primary);
+    border-color: var(--primary-light);
+    transform: scale(1.08);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Danger-specific actions (e.g., Delete, Evict) */
+.table-actions button.danger:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-light);
+}
+
+/* ----- Empty State (When no data is present) ----- */
+.empty-state {
+    text-align: center;
+    padding: 56px 24px;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+}
+
+.empty-state i {
+    font-size: 3.5rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    opacity: 0.6;
+}
+
+.empty-state h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.empty-state p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+/* ----- Pagination (Bottom of tables) ----- */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-card);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pagination-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.pagination-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+}
+
+.pagination-btn:hover:not(:disabled):not(.active) {
+    background: var(--primary-bg);
+    color: var(--primary);
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
 }
 
 .pagination-btn.active {
     background: var(--primary);
     color: white;
+    box-shadow: 0 4px 12px rgba(212, 132, 90, 0.3);
+    border-color: var(--primary);
 }
 
 .pagination-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
+    transform: none !important;
+}
+
+/* ----- Responsive Tweaks ----- */
+@media (max-width: 768px) {
+    .table th,
+    .table td {
+        padding: 12px 14px;
+        font-size: 0.85rem;
+    }
+    .pagination {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+        gap: 8px;
+    }
+    .pagination-buttons {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .table-actions button {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .table th {
+        font-size: 0.65rem;
+        padding: 10px 10px;
+    }
+    .table td {
+        padding: 10px 10px;
+        font-size: 0.8rem;
+    }
+    .empty-state {
+        padding: 32px 16px;
+    }
+    .empty-state i {
+        font-size: 2.5rem;
+    }
 }
