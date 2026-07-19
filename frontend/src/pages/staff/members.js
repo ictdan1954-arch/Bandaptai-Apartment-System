@@ -17,20 +17,22 @@ export default async function staffMembers(container) {
         }
     }
 
-    // Local cache of existing user accounts – refreshed after every create/edit
-    let staffUsers = [];
-    let caretakerUsers = [];
-    async function refreshUserLists() {
+    // Local cache of members with account info (from the new endpoint)
+    let membersWithAccounts = [];
+
+    // Fetch members with account status from the new endpoint (no permission error)
+    async function loadMembersWithAccounts() {
+        const aptId = defaultAptId || ''; // caretaker
+        if (!aptId) return;
         try {
-            const [staffRes, caretakerRes] = await Promise.all([
-                apiService.get('/auth/users?role=staff'),
-                apiService.get('/auth/users?role=caretaker')
-            ]);
-            if (staffRes.success) staffUsers = staffRes.data;
-            if (caretakerRes.success) caretakerUsers = caretakerRes.data;
+            const res = await apiService.get(`/staff/members/apartment/${aptId}/accounts`);
+            if (res.success) membersWithAccounts = res.data;
         } catch (e) { /* ignore */ }
     }
-    await refreshUserLists();
+
+    if (role === 'caretaker') {
+        await loadMembersWithAccounts();
+    }
 
     container.innerHTML = `
         <div class="card">
@@ -78,94 +80,106 @@ export default async function staffMembers(container) {
             return;
         }
 
-        let query = `apartment/${selectedAptId}`;
-        if (selectedRoleId) query += `?role_id=${selectedRoleId}`;
-
-        try {
-            const response = await apiService.get(`/staff/members/${query}`);
-            let members = response.success ? response.data : [];
-
-            if (role === 'caretaker' && members.length > 0) {
-                members = [...members].sort((a, b) => {
-                    const aC = a.staff_roles?.role_name?.toLowerCase() === 'caretaker';
-                    const bC = b.staff_roles?.role_name?.toLowerCase() === 'caretaker';
-                    if (aC && !bC) return -1;
-                    if (!aC && bC) return 1;
-                    return 0;
-                });
-            }
-
-            if (members.length === 0) {
-                membersTable.innerHTML = `<div class="empty-state"><h3>No staff members</h3></div>`;
+        // For caretaker we already have membersWithAccounts; for landlord fetch fresh from new endpoint
+        let members = [];
+        if (role === 'caretaker') {
+            members = membersWithAccounts;
+            if (selectedRoleId) members = members.filter(m => m.staff_role_id === selectedRoleId);
+        } else {
+            try {
+                const response = await apiService.get(`/staff/members/apartment/${selectedAptId}/accounts`);
+                members = response.success ? response.data : [];
+            } catch (e) {
+                membersTable.innerHTML = `<div class="error-state"><p>${e.message}</p></div>`;
                 return;
             }
-
-            membersTable.innerHTML = `
-                <table class="table">
-                    <thead>
-                        <tr><th>Name</th><th>Role</th><th>Phone</th><th>Salary</th><th>Status</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        ${members.map(m => {
-                            const phone = m.phone;
-                            const existingStaff = staffUsers.find(u => u.phone === phone);
-                            const existingCaretaker = caretakerUsers.find(u => u.phone === phone);
-                            const hasAccount = !!(existingStaff || existingCaretaker);
-                            const existingUser = existingStaff || existingCaretaker;
-                            const roleName = (m.staff_roles?.role_name || '').toLowerCase();
-
-                            let accountButton = '';
-                            if (!hasAccount) {
-                                if (roleName === 'caretaker') {
-                                    accountButton = `<button class="create-caretaker-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" title="Create Caretaker Account"><i class="fas fa-user-plus"></i></button>`;
-                                } else {
-                                    accountButton = `<button class="create-staff-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" title="Create Account"><i class="fas fa-user-plus"></i></button>`;
-                                }
-                            } else {
-                                // Eye icon for viewing/editing existing account
-                                accountButton = `<button class="edit-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" data-username="${existingUser?.username || ''}" title="View / Edit Account"><i class="fas fa-eye"></i></button>`;
-                            }
-
-                            return `
-                            <tr>
-                                <td>${m.full_name}</td>
-                                <td>${m.staff_roles?.role_name || 'N/A'}</td>
-                                <td>${phone}</td>
-                                <td>${formatCurrency(m.monthly_salary)}</td>
-                                <td><span class="badge badge-${m.status === 'active' ? 'success' : 'danger'}">${m.status}</span></td>
-                                <td>
-                                    <div class="table-actions">
-                                        <button class="edit-btn" data-id="${m.id}" title="Edit"><i class="fas fa-edit"></i></button>
-                                        <button class="pay-btn" data-id="${m.id}" data-name="${m.full_name}" data-apt="${selectedAptId}" title="Pay Salary"><i class="fas fa-money-bill"></i></button>
-                                        ${accountButton}
-                                    </div>
-                                </td>
-                            </tr>`;
-                        }).join('')}
-                    </tbody>
-                </table>`;
-
-            // Event delegation
-            membersTable.addEventListener('click', (e) => {
-                const editBtn = e.target.closest('.edit-btn');
-                if (editBtn) { editStaffMember(editBtn.dataset.id); return; }
-
-                const payBtn = e.target.closest('.pay-btn');
-                if (payBtn) { paySalary(payBtn.dataset.id, payBtn.dataset.name, payBtn.dataset.apt); return; }
-
-                const createCaretakerBtn = e.target.closest('.create-caretaker-btn');
-                if (createCaretakerBtn) { createCaretakerAccount(createCaretakerBtn.dataset.id, createCaretakerBtn.dataset.name, createCaretakerBtn.dataset.phone); return; }
-
-                const createStaffBtn = e.target.closest('.create-staff-account-btn');
-                if (createStaffBtn) { createStaffAccount(createStaffBtn.dataset.id, createStaffBtn.dataset.name, createStaffBtn.dataset.phone); return; }
-
-                const editAccountBtn = e.target.closest('.edit-account-btn');
-                if (editAccountBtn) { editStaffAccount(editAccountBtn.dataset.id, editAccountBtn.dataset.name, editAccountBtn.dataset.phone, editAccountBtn.dataset.username); return; }
-            });
-
-        } catch (e) {
-            membersTable.innerHTML = `<div class="error-state"><p>${e.message}</p></div>`;
         }
+
+        // Sort caretaker first for caretaker view
+        if (role === 'caretaker' && members.length > 0) {
+            members = [...members].sort((a, b) => {
+                const aC = a.staff_roles?.role_name?.toLowerCase() === 'caretaker';
+                const bC = b.staff_roles?.role_name?.toLowerCase() === 'caretaker';
+                if (aC && !bC) return -1;
+                if (!aC && bC) return 1;
+                return 0;
+            });
+        }
+
+        if (members.length === 0) {
+            membersTable.innerHTML = `<div class="empty-state"><h3>No staff members</h3></div>`;
+            return;
+        }
+
+        membersTable.innerHTML = `
+            <table class="table">
+                <thead>
+                    <tr><th>Name</th><th>Role</th><th>Phone</th><th>Salary</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    ${members.map(m => {
+                        const phone = m.phone;
+                        const hasAccount = m.has_account;
+                        const existingUser = m.user;
+                        const roleName = (m.staff_roles?.role_name || '').toLowerCase();
+
+                        let accountButton = '';
+                        if (!hasAccount) {
+                            if (roleName === 'caretaker') {
+                                accountButton = `<button class="create-caretaker-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" title="Create Caretaker Account"><i class="fas fa-user-plus"></i></button>`;
+                            } else {
+                                accountButton = `<button class="create-staff-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" title="Create Account"><i class="fas fa-user-plus"></i></button>`;
+                            }
+                        } else {
+                            accountButton = `<button class="edit-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" data-username="${existingUser?.username || ''}" data-userid="${existingUser?.id || ''}" title="View / Edit Account"><i class="fas fa-eye"></i></button>`;
+                        }
+
+                        return `
+                        <tr>
+                            <td>${m.full_name}</td>
+                            <td>${m.staff_roles?.role_name || 'N/A'}</td>
+                            <td>${phone}</td>
+                            <td>${formatCurrency(m.monthly_salary)}</td>
+                            <td><span class="badge badge-${m.status === 'active' ? 'success' : 'danger'}">${m.status}</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="edit-btn" data-id="${m.id}" title="Edit"><i class="fas fa-edit"></i></button>
+                                    <button class="pay-btn" data-id="${m.id}" data-name="${m.full_name}" data-apt="${selectedAptId}" title="Pay Salary"><i class="fas fa-money-bill"></i></button>
+                                    ${accountButton}
+                                </div>
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+
+        // Event delegation
+        membersTable.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-btn');
+            if (editBtn) { editStaffMember(editBtn.dataset.id); return; }
+
+            const payBtn = e.target.closest('.pay-btn');
+            if (payBtn) { paySalary(payBtn.dataset.id, payBtn.dataset.name, payBtn.dataset.apt); return; }
+
+            const createCaretakerBtn = e.target.closest('.create-caretaker-btn');
+            if (createCaretakerBtn) { createCaretakerAccount(createCaretakerBtn.dataset.id, createCaretakerBtn.dataset.name, createCaretakerBtn.dataset.phone); return; }
+
+            const createStaffBtn = e.target.closest('.create-staff-account-btn');
+            if (createStaffBtn) { createStaffAccount(createStaffBtn.dataset.id, createStaffBtn.dataset.name, createStaffBtn.dataset.phone); return; }
+
+            const editAccountBtn = e.target.closest('.edit-account-btn');
+            if (editAccountBtn) {
+                editStaffAccount(
+                    editAccountBtn.dataset.id,
+                    editAccountBtn.dataset.name,
+                    editAccountBtn.dataset.phone,
+                    editAccountBtn.dataset.username,
+                    editAccountBtn.dataset.userid
+                );
+                return;
+            }
+        });
+
     }
 
     loadMembers();
@@ -210,6 +224,7 @@ export default async function staffMembers(container) {
             try {
                 await apiService.post('/staff/members', data);
                 showToast('Staff member added', 'success');
+                if (role === 'caretaker') await loadMembersWithAccounts();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
@@ -247,12 +262,13 @@ export default async function staffMembers(container) {
             try {
                 await apiService.put(`/staff/members/${memberId}`, updates);
                 showToast('Staff member updated', 'success');
+                if (role === 'caretaker') await loadMembersWithAccounts();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
     }
 
-    // Create staff account (role = 'staff')
+    // Create staff account – updates local cache immediately
     async function createStaffAccount(staffId, name, phone) {
         const { showFormModal } = await import('../../components/modal.js');
         const defaultPassword = phone.replace(/\D/g, '').slice(-6) || '123456';
@@ -268,23 +284,25 @@ export default async function staffMembers(container) {
             const password = overlay.querySelector('#staff-password').value;
             if (!username || !password) { showToast('Username and password required', 'error'); return false; }
             try {
-                await apiService.post('/staff/accounts', { staff_id: staffId, username, password });
+                const res = await apiService.post('/staff/accounts', { staff_id: staffId, username, password });
+                // Update local cache
+                const member = membersWithAccounts.find(m => m.id === staffId);
+                if (member) {
+                    member.user = { id: res.data?.id, phone, username, role: 'staff' };
+                    member.has_account = true;
+                }
                 showToast(`Account created! Username: ${username}`, 'success');
-                await refreshUserLists();      // update local cache
-                loadMembers();                 // re‑render → button becomes eye
+                loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
     }
 
-    // Edit existing staff/caretaker account
-    async function editStaffAccount(staffId, name, phone, currentUsername) {
+    // Edit existing account – updates local cache in-place
+    async function editStaffAccount(staffId, name, phone, currentUsername, userId) {
         const { showFormModal } = await import('../../components/modal.js');
-        const existingUser = staffUsers.find(u => u.phone === phone) || caretakerUsers.find(u => u.phone === phone);
-        if (!existingUser) { showToast('User account not found', 'error'); return; }
-
         const formHtml = `
             <p>Edit account for <strong>${name}</strong> (${phone})</p>
-            <div class="form-group"><label class="form-label">Username</label><input type="text" class="form-input" id="edit-staff-username" value="${existingUser.username || ''}"></div>
+            <div class="form-group"><label class="form-label">Username</label><input type="text" class="form-input" id="edit-staff-username" value="${currentUsername || ''}"></div>
             <div class="form-group"><label class="form-label">New Password (leave blank to keep current)</label><input type="password" class="form-input" id="edit-staff-password" placeholder="Min 6 characters"></div>`;
 
         showFormModal('Edit Staff Account', formHtml, async (overlay) => {
@@ -298,15 +316,17 @@ export default async function staffMembers(container) {
                 body.password = newPassword;
             }
             try {
-                await apiService.put(`/auth/users/${existingUser.id}`, body);
+                await apiService.put(`/auth/users/${userId}`, body);
+                // Update local cache
+                const member = membersWithAccounts.find(m => m.id === staffId);
+                if (member && member.user) member.user.username = newUsername;
                 showToast('Account updated', 'success');
-                await refreshUserLists();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
     }
 
-    // Create caretaker account (role = 'caretaker')
+    // Create caretaker account – updates local cache immediately
     async function createCaretakerAccount(staffId, name, phone) {
         const { showFormModal } = await import('../../components/modal.js');
         const defaultPassword = phone.replace(/\D/g, '').slice(-6) || '123456';
@@ -324,9 +344,14 @@ export default async function staffMembers(container) {
             const password = overlay.querySelector('#caretaker-password').value;
             if (!username) { showToast('Username required', 'error'); return false; }
             try {
-                await apiService.post('/auth/register', { full_name: name, phone: phone, password, role: 'caretaker', username });
+                const res = await apiService.post('/auth/register', { full_name: name, phone: phone, password, role: 'caretaker', username });
+                // Update local cache
+                const member = membersWithAccounts.find(m => m.id === staffId);
+                if (member) {
+                    member.user = { id: res.data?.id, phone, username, role: 'caretaker' };
+                    member.has_account = true;
+                }
                 showToast(`Caretaker account created! Username: ${username}`, 'success');
-                await refreshUserLists();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
