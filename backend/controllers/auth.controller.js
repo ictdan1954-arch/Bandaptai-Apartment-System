@@ -192,16 +192,59 @@ const authController = {
         }
     },
 
-    // Update user (Landlord only, for managing caretaker/tenant accounts)
+    // Update user (Landlord full access, Caretaker only staff in their apartment)
     async updateUser(req, res) {
         try {
             const { userId } = req.params;
             const { full_name, password, username } = req.body;
 
-            // Only landlord can update other users
-            if (req.user.role !== 'landlord') {
-                return ApiResponse.forbidden(res, 'Only landlord can update user accounts');
+            // Get the target user
+            const { data: targetUser, error: fetchError } = await supabase
+                .from('users')
+                .select('id, phone, role')
+                .eq('id', userId)
+                .single();
+
+            if (fetchError || !targetUser) {
+                return ApiResponse.notFound(res, 'User not found');
             }
+
+            // Caretaker restrictions
+            if (req.user.role === 'caretaker') {
+                // 1. Cannot edit themselves
+                if (targetUser.id === req.user.id) {
+                    return ApiResponse.forbidden(res, 'You cannot edit your own account');
+                }
+                // 2. Cannot edit tenants
+                if (targetUser.role === 'tenant') {
+                    return ApiResponse.forbidden(res, 'You cannot edit tenant accounts');
+                }
+
+                // 3. Verify the user is linked to a staff member in one of the caretaker's apartments
+                const { data: staff } = await supabase
+                    .from('staff_members')
+                    .select('apartment_id')
+                    .eq('phone', targetUser.phone)
+                    .maybeSingle();
+
+                if (!staff) {
+                    return ApiResponse.forbidden(res, 'You can only edit users linked to your apartment staff');
+                }
+
+                const { data: assignment } = await supabase
+                    .from('caretaker_assignments')
+                    .select('id')
+                    .eq('user_id', req.user.id)
+                    .eq('apartment_id', staff.apartment_id)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (!assignment) {
+                    return ApiResponse.forbidden(res, 'You can only edit staff from your assigned apartment');
+                }
+            }
+
+            // Landlord has no restrictions
 
             const updateData = {};
             if (full_name) updateData.full_name = full_name;
