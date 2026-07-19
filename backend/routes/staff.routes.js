@@ -13,7 +13,14 @@ router.delete('/roles/:id', authorize('landlord'), staffController.deleteRole);
 
 // Staff Members
 router.post('/members', authorize('landlord', 'caretaker'), staffController.createMember);
+
+// Specific routes first – accounts with status
+router.get('/members/apartment/:apartmentId/accounts', authorize('landlord', 'caretaker'), staffController.getMembersWithAccounts);
+
+// Then generic apartment members
 router.get('/members/apartment/:apartmentId', authorize('landlord', 'caretaker'), staffController.getMembers);
+
+// Single member by ID
 router.get('/members/:id', authorize('landlord', 'caretaker'), staffController.getMemberById);
 router.put('/members/:id', authorize('landlord', 'caretaker'), staffController.updateMember);
 router.delete('/members/:id', authorize('landlord', 'caretaker'), staffController.deleteMember);
@@ -25,8 +32,5 @@ router.post('/accounts', authorize('landlord', 'caretaker'), staffController.cre
 router.post('/salaries', authorize('landlord', 'caretaker'), staffController.recordSalary);
 router.get('/salaries/apartment/:apartmentId', authorize('landlord', 'caretaker'), staffController.getSalaries);
 router.delete('/salaries/:id', authorize('landlord'), staffController.deleteSalary);
-
-// Staff members with account status
-router.get('/members/apartment/:apartmentId/accounts', authorize('landlord', 'caretaker'), staffController.getMembersWithAccounts);
 
 module.exports = router;
