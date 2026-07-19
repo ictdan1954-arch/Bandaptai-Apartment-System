@@ -1,79 +1,130 @@
 /* =============================================
-   TOAST NOTIFICATIONS
+   TOAST NOTIFICATIONS - ESTATE CALM
+   Gentle, warm, and informative feedback.
    ============================================= */
+
+/* ----- Toast Container (Top right anchor) ----- */
 .toast-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: 24px;
+    right: 24px;
     z-index: 2000;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    max-width: 440px;
+    width: 100%;
+    pointer-events: none;
 }
 
+/* Ensure toasts inside are clickable */
+.toast-container .toast {
+    pointer-events: auto;
+}
+
+/* ----- Individual Toast (Base) ----- */
 .toast {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
+    gap: 14px;
+    padding: 16px 20px;
     background: var(--bg-card);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    border-left: 4px solid var(--primary);
-    min-width: 320px;
-    max-width: 420px;
-    animation: slideInRight 0.3s ease;
+    border-left: 5px solid var(--primary);
+    border: 1px solid var(--border-light);
+    border-left-width: 5px;
+    min-width: 300px;
+    width: 100%;
+    animation: slideInRight 0.4s cubic-bezier(0.21, 0.98, 0.35, 1.0);
     position: relative;
+    transition: box-shadow var(--transition-fast);
 }
 
+.toast:hover {
+    box-shadow: var(--shadow-xl);
+}
+
+/* --- Toast Variants (Coloured backgrounds & borders) --- */
 .toast.success {
     border-left-color: var(--secondary);
+    background: var(--secondary-bg);
+    border-color: var(--secondary);
+    border-left-width: 5px;
 }
 
 .toast.error {
     border-left-color: var(--danger);
+    background: var(--danger-bg);
+    border-color: var(--danger-light);
+    border-left-width: 5px;
 }
 
 .toast.warning {
     border-left-color: var(--warning);
+    background: var(--warning-bg);
+    border-color: var(--warning-light);
+    border-left-width: 5px;
 }
 
+/* --- Toast Icon --- */
 .toast-icon {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
     flex-shrink: 0;
+    width: 28px;
+    text-align: center;
 }
 
-.toast.success .toast-icon { color: var(--secondary); }
+.toast .toast-icon { color: var(--primary); }
+.toast.success .toast-icon { color: var(--secondary-dark); }
 .toast.error .toast-icon { color: var(--danger); }
-.toast.warning .toast-icon { color: var(--warning); }
+.toast.warning .toast-icon { color: #A87D52; } /* Darker gold for contrast */
 
+/* --- Toast Message --- */
 .toast-message {
     flex: 1;
     font-size: 0.9rem;
+    font-weight: 500;
     color: var(--text-primary);
+    line-height: 1.4;
 }
 
+.toast-message small {
+    display: block;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* --- Toast Close Button --- */
 .toast-close {
     background: none;
     color: var(--text-muted);
-    font-size: 0.9rem;
-    padding: 4px;
+    font-size: 1rem;
+    padding: 4px 6px;
     cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+    line-height: 1;
 }
 
 .toast-close:hover {
     color: var(--text-primary);
+    background: rgba(45, 42, 40, 0.06);
 }
 
+/* --- Toast Exit Animation --- */
 .toast.removing {
-    animation: slideOutRight 0.3s ease forwards;
+    animation: slideOutRight 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Notification Bell */
+/* ----- Notification Bell (Navbar Icon) ----- */
 .notification-bell {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: var(--radius-full);
     background: var(--bg-input);
     display: flex;
@@ -82,56 +133,64 @@
     cursor: pointer;
     transition: all var(--transition-fast);
     color: var(--text-secondary);
-    font-size: 1.1rem;
+    font-size: 1.2rem;
+    border: 1px solid transparent;
 }
 
 .notification-bell:hover {
     background: var(--primary-bg);
     color: var(--primary);
+    border-color: var(--primary-light);
+    transform: scale(1.04);
 }
 
+/* --- Notification Count Badge (Rust dot) --- */
 .notification-count {
     position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 20px;
+    top: -4px;
+    right: -4px;
+    min-width: 20px;
     height: 20px;
     background: var(--danger);
-    color: white;
-    font-size: 0.7rem;
+    color: #FFFFFF;
+    font-size: 0.65rem;
     font-weight: 700;
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 0 6px;
+    border: 2px solid var(--bg-card);
     display: none;
 }
 
 .notification-count.has-notifications {
     display: flex;
+    animation: fadeIn 0.3s ease;
 }
 
-/* Notification Dropdown */
+/* ----- Notification Dropdown (Flyout) ----- */
 .notification-dropdown {
     position: absolute;
-    top: 48px;
+    top: 52px;
     right: 0;
     width: 380px;
     max-height: 480px;
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-light);
     overflow: hidden;
     z-index: 500;
     display: none;
+    animation: fadeIn 0.2s ease;
 }
 
 .notification-dropdown.open {
     display: block;
-    animation: fadeIn 0.2s ease;
 }
 
+/* --- Dropdown Header --- */
 .notification-dropdown-header {
     padding: 16px 20px;
     border-bottom: 1px solid var(--border);
@@ -139,40 +198,89 @@
     justify-content: space-between;
     align-items: center;
     font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    background: var(--bg-main);
 }
 
+.notification-dropdown-header .mark-all-read {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+    background: none;
+    border: none;
+}
+
+.notification-dropdown-header .mark-all-read:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+/* --- Notification List (Scrollable) --- */
 .notification-list {
     max-height: 380px;
     overflow-y: auto;
 }
 
+.notification-list::-webkit-scrollbar {
+    width: 4px;
+}
+.notification-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.notification-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+}
+
+/* --- Individual Notification Item --- */
 .notification-item {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border-light);
     cursor: pointer;
-    transition: background var(--transition-fast);
+    transition: all var(--transition-fast);
     display: flex;
-    gap: 12px;
+    gap: 14px;
+    align-items: flex-start;
 }
 
 .notification-item:hover {
     background: var(--bg-input);
 }
 
+/* Unread state (Warm peach glow) */
 .notification-item.unread {
     background: var(--primary-bg);
+    border-left: 3px solid var(--primary);
+    padding-left: 17px; /* Compensate for border */
 }
 
+.notification-item.unread:hover {
+    background: rgba(212, 132, 90, 0.15);
+}
+
+/* --- Notification Item Icon --- */
 .notification-item-icon {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 1rem;
 }
 
+.notification-item.unread .notification-item-icon {
+    background: var(--primary-bg);
+    color: var(--primary);
+}
+
+/* --- Notification Item Content --- */
 .notification-item-content {
     flex: 1;
     min-width: 0;
@@ -181,19 +289,23 @@
 .notification-item-title {
     font-weight: 600;
     font-size: 0.85rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
 }
 
 .notification-item-message {
     font-size: 0.8rem;
     color: var(--text-secondary);
+    line-height: 1.4;
 }
 
 .notification-item-time {
     font-size: 0.7rem;
     color: var(--text-muted);
+    margin-top: 4px;
 }
 
-/* Page Loader */
+/* ----- Page Loader / Spinner ----- */
 .page-loader {
     display: flex;
     align-items: center;
@@ -204,12 +316,14 @@
 .spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid var(--border);
+    border: 4px solid var(--border-light);
     border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    box-shadow: 0 0 20px rgba(212, 132, 90, 0.05);
 }
 
+/* ----- Error State (Page-level fallback) ----- */
 .error-state {
     text-align: center;
     padding: 60px 24px;
@@ -220,24 +334,111 @@
     font-size: 4rem;
     color: var(--danger);
     margin-bottom: 16px;
+    opacity: 0.8;
 }
 
 .error-state h2 {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
+    font-weight: 700;
     margin-bottom: 8px;
     color: var(--text-primary);
 }
 
+.error-state p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    max-width: 400px;
+    margin: 0 auto 20px;
+}
+
+/* ----- Keyframes (Animations) ----- */
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes slideInRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+    from {
+        transform: translateX(calc(100% + 30px));
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes slideOutRight {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(100%); opacity: 0; }
+    from {
+        transform: translateX(0);
+        opacity: 1;
+        max-height: 200px;
+        margin-bottom: 12px;
+    }
+    to {
+        transform: translateX(calc(100% + 30px));
+        opacity: 0;
+        max-height: 0;
+        margin-bottom: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ----- Responsive Tweaks ----- */
+@media (max-width: 768px) {
+    .toast-container {
+        top: 16px;
+        right: 16px;
+        left: 16px;
+        max-width: 100%;
+        gap: 10px;
+    }
+    .toast {
+        min-width: unset;
+        padding: 14px 16px;
+        font-size: 0.85rem;
+    }
+    .toast-icon {
+        font-size: 1.2rem;
+    }
+    .notification-dropdown {
+        width: calc(100vw - 24px);
+        right: -8px;
+        top: 48px;
+        max-height: 400px;
+    }
+    .notification-bell {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .toast-container {
+        top: 12px;
+        right: 12px;
+        left: 12px;
+    }
+    .toast {
+        padding: 12px 14px;
+        gap: 10px;
+        border-left-width: 4px;
+    }
+    .notification-item {
+        padding: 12px 16px;
+    }
 }
