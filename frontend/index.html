@@ -23,14 +23,24 @@
     <link rel="stylesheet" href="css/components/dashboard.css">
     <link rel="stylesheet" href="css/components/notifications.css">
 </head>
-<body>
+<body class="dashboard-page">
     <!-- Main App Container -->
     <div id="app">
         <!-- Sidebar -->
         <aside id="sidebar" class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
-                    <i class="fas fa-building"></i>
+                    <!-- 
+                        LOGO IMAGE 
+                        Replace 'assets/images/logo.png' with your actual logo file path.
+                        Supported formats: PNG, JPG, SVG, WebP
+                    -->
+                    <img 
+                        src="assets/images/logo.png" 
+                        alt="Bandaptai Apartments Logo" 
+                        class="logo-image"
+                        id="logo-image"
+                    >
                     <span class="logo-text">Bandaptai</span>
                 </div>
                 <button id="sidebar-toggle" class="sidebar-toggle">
