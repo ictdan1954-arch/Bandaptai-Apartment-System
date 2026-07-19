@@ -80,7 +80,6 @@ html {
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-main);
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
@@ -88,6 +87,103 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* =============================================
+   PAGE-SPECIFIC BACKGROUND IMAGES
+   Login: Full immersive splash
+   Dashboard: Subtle textured overlay
+   ============================================= */
+
+/* ----- 1. DASHBOARD PAGE (Subtle textured background) ----- */
+body.dashboard-page {
+    /* A soft, warm image for the main app */
+    background-image: url('../assets/images/dashboard-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    
+    /* THE MAGIC: Overlays your 'Estate Calm' linen colour (92% opaque)
+       so the image is barely visible, just acting as texture */
+    background-blend-mode: overlay;
+    background-color: rgba(247, 246, 242, 0.92);
+}
+
+/* Make the main app container fully transparent so the background image shows through */
+body.dashboard-page #app {
+    background: transparent;
+}
+
+/* Make the main content area transparent */
+body.dashboard-page .main-content {
+    background: transparent;
+}
+
+/* 
+   Give your cards & tables a slightly "glassy" feel so they
+   float gracefully over the subtle background texture.
+*/
+body.dashboard-page .card,
+body.dashboard-page .stat-card,
+body.dashboard-page .table-container,
+body.dashboard-page .modal {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Keep the sidebar solid so it remains sharp and grounded */
+body.dashboard-page .sidebar {
+    background: #2D2A28; /* Solid charcoal */
+    backdrop-filter: none;
+}
+
+/* Keep the top navbar slightly glassy but readable */
+body.dashboard-page .top-navbar {
+    background: rgba(255, 255, 255, 0.80);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* ----- 2. LOGIN PAGE (Full immersive splash) ----- */
+body.login-page {
+    /* The hero image */
+    background-image: url('../assets/images/login-splash.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    
+    /* Safe fallback colour */
+    background-color: #2D2A28;
+    
+    /* Ensure the body takes full height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+/* 
+   IMPORTANT: This assumes your login form is wrapped in a container 
+   like <div class="login-container"> or <div class="auth-container">.
+   If you use a different class name, just replace ".login-container" below.
+*/
+body.login-page .login-container,
+body.login-page .auth-container {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius-lg);
+    padding: 48px 40px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    max-width: 440px;
+    width: 100%;
+    animation: slideUp 0.5s cubic-bezier(0.21, 0.98, 0.35, 1.0);
+}
+
+/* =============================================
+   LINKS
+   ============================================= */
 a {
     text-decoration: none;
     color: var(--primary);
@@ -364,6 +460,31 @@ input, select, textarea {
 }
 
 /* =============================================
+   KEYFRAMES (Shared animations)
+   ============================================= */
+@keyframes slideUp {
+    from {
+        transform: translateY(24px) scale(0.98);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* =============================================
    RESPONSIVE
    ============================================= */
 @media (max-width: 1024px) {
@@ -407,6 +528,14 @@ input, select, textarea {
     .page-title {
         font-size: 1.1rem;
     }
+    
+    /* Login page responsive */
+    body.login-page .login-container,
+    body.login-page .auth-container {
+        padding: 32px 24px;
+        margin: 16px;
+        max-width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -416,5 +545,11 @@ input, select, textarea {
     }
     .navbar-right .btn span {
         display: none; /* Hide text on tiny screens, keep icons */
+    }
+    
+    /* Login page mobile */
+    body.login-page .login-container,
+    body.login-page .auth-container {
+        padding: 24px 16px;
     }
 }
