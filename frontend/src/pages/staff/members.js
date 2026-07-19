@@ -17,17 +17,20 @@ export default async function staffMembers(container) {
         }
     }
 
-    // Fetch all users (staff + caretaker roles) once for account existence checks
+    // Local cache of existing user accounts – refreshed after every create/edit
     let staffUsers = [];
     let caretakerUsers = [];
-    try {
-        const [staffRes, caretakerRes] = await Promise.all([
-            apiService.get('/auth/users?role=staff'),
-            apiService.get('/auth/users?role=caretaker')
-        ]);
-        if (staffRes.success) staffUsers = staffRes.data;
-        if (caretakerRes.success) caretakerUsers = caretakerRes.data;
-    } catch (e) {}
+    async function refreshUserLists() {
+        try {
+            const [staffRes, caretakerRes] = await Promise.all([
+                apiService.get('/auth/users?role=staff'),
+                apiService.get('/auth/users?role=caretaker')
+            ]);
+            if (staffRes.success) staffUsers = staffRes.data;
+            if (caretakerRes.success) caretakerUsers = caretakerRes.data;
+        } catch (e) { /* ignore */ }
+    }
+    await refreshUserLists();
 
     container.innerHTML = `
         <div class="card">
@@ -39,12 +42,8 @@ export default async function staffMembers(container) {
             </div>
             ${role === 'landlord' ? `
             <div class="filter-bar">
-                <select class="form-select" id="filter-apt">
-                    <option value="">All Apartments</option>
-                </select>
-                <select class="form-select" id="filter-role">
-                    <option value="">All Roles</option>
-                </select>
+                <select class="form-select" id="filter-apt"><option value="">All Apartments</option></select>
+                <select class="form-select" id="filter-role"><option value="">All Roles</option></select>
             </div>` : ''}
             <div id="members-table" class="table-container">
                 <div class="page-loader"><div class="spinner"></div></div>
@@ -57,21 +56,14 @@ export default async function staffMembers(container) {
     const membersTable = container.querySelector('#members-table');
 
     if (role === 'landlord') {
-        const [aptRes, rolesRes] = await Promise.all([
-            apiService.get('/apartments'),
-            apiService.get('/staff/roles')
-        ]);
-        if (aptRes.success) {
-            aptRes.data.forEach(a => filterApt.innerHTML += `<option value="${a.id}">${a.name}</option>`);
-        }
-        if (rolesRes.success) {
-            rolesRes.data.forEach(r => filterRole.innerHTML += `<option value="${r.id}">${r.role_name}</option>`);
-        }
-        filterApt.addEventListener('change', () => loadMembers());
-        filterRole.addEventListener('change', () => loadMembers());
+        const [aptRes, rolesRes] = await Promise.all([apiService.get('/apartments'), apiService.get('/staff/roles')]);
+        if (aptRes.success) aptRes.data.forEach(a => filterApt.innerHTML += `<option value="${a.id}">${a.name}</option>`);
+        if (rolesRes.success) rolesRes.data.forEach(r => filterRole.innerHTML += `<option value="${r.id}">${r.role_name}</option>`);
+        filterApt.addEventListener('change', loadMembers);
+        filterRole.addEventListener('change', loadMembers);
     }
 
-    addBtn.addEventListener('click', () => openAddModal());
+    addBtn.addEventListener('click', openAddModal);
 
     let selectedAptId = defaultAptId || '';
     let selectedRoleId = '';
@@ -111,20 +103,16 @@ export default async function staffMembers(container) {
             membersTable.innerHTML = `
                 <table class="table">
                     <thead>
-                        <tr>
-                            <th>Name</th><th>Role</th><th>Phone</th><th>Salary</th><th>Status</th><th>Actions</th>
-                        </tr>
+                        <tr><th>Name</th><th>Role</th><th>Phone</th><th>Salary</th><th>Status</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                         ${members.map(m => {
-                            const roleName = m.staff_roles?.role_name?.toLowerCase() || '';
                             const phone = m.phone;
-
-                            // Check if any user (staff or caretaker) exists with this phone
                             const existingStaff = staffUsers.find(u => u.phone === phone);
                             const existingCaretaker = caretakerUsers.find(u => u.phone === phone);
                             const hasAccount = !!(existingStaff || existingCaretaker);
                             const existingUser = existingStaff || existingCaretaker;
+                            const roleName = (m.staff_roles?.role_name || '').toLowerCase();
 
                             let accountButton = '';
                             if (!hasAccount) {
@@ -134,7 +122,8 @@ export default async function staffMembers(container) {
                                     accountButton = `<button class="create-staff-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" title="Create Account"><i class="fas fa-user-plus"></i></button>`;
                                 }
                             } else {
-                                accountButton = `<button class="edit-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" data-username="${existingUser?.username || ''}" title="Edit Account"><i class="fas fa-key"></i></button>`;
+                                // Eye icon for viewing/editing existing account
+                                accountButton = `<button class="edit-account-btn" data-id="${m.id}" data-name="${m.full_name}" data-phone="${phone}" data-username="${existingUser?.username || ''}" title="View / Edit Account"><i class="fas fa-eye"></i></button>`;
                             }
 
                             return `
@@ -159,30 +148,19 @@ export default async function staffMembers(container) {
             // Event delegation
             membersTable.addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-btn');
-                if (editBtn) {
-                    editStaffMember(editBtn.dataset.id);
-                    return;
-                }
+                if (editBtn) { editStaffMember(editBtn.dataset.id); return; }
+
                 const payBtn = e.target.closest('.pay-btn');
-                if (payBtn) {
-                    paySalary(payBtn.dataset.id, payBtn.dataset.name, payBtn.dataset.apt);
-                    return;
-                }
+                if (payBtn) { paySalary(payBtn.dataset.id, payBtn.dataset.name, payBtn.dataset.apt); return; }
+
                 const createCaretakerBtn = e.target.closest('.create-caretaker-btn');
-                if (createCaretakerBtn) {
-                    createCaretakerAccount(createCaretakerBtn.dataset.id, createCaretakerBtn.dataset.name, createCaretakerBtn.dataset.phone);
-                    return;
-                }
+                if (createCaretakerBtn) { createCaretakerAccount(createCaretakerBtn.dataset.id, createCaretakerBtn.dataset.name, createCaretakerBtn.dataset.phone); return; }
+
                 const createStaffBtn = e.target.closest('.create-staff-account-btn');
-                if (createStaffBtn) {
-                    createStaffAccount(createStaffBtn.dataset.id, createStaffBtn.dataset.name, createStaffBtn.dataset.phone);
-                    return;
-                }
+                if (createStaffBtn) { createStaffAccount(createStaffBtn.dataset.id, createStaffBtn.dataset.name, createStaffBtn.dataset.phone); return; }
+
                 const editAccountBtn = e.target.closest('.edit-account-btn');
-                if (editAccountBtn) {
-                    editStaffAccount(editAccountBtn.dataset.id, editAccountBtn.dataset.name, editAccountBtn.dataset.phone, editAccountBtn.dataset.username);
-                    return;
-                }
+                if (editAccountBtn) { editStaffAccount(editAccountBtn.dataset.id, editAccountBtn.dataset.name, editAccountBtn.dataset.phone, editAccountBtn.dataset.username); return; }
             });
 
         } catch (e) {
@@ -190,11 +168,9 @@ export default async function staffMembers(container) {
         }
     }
 
-    // Initial load
     loadMembers();
 
-    // ========== MODALS ==========
-
+    // ---------- MODALS ----------
     async function openAddModal() {
         const { showFormModal } = await import('../../components/modal.js');
         let apartmentsHtml = '', rolesHtml = '';
@@ -210,7 +186,7 @@ export default async function staffMembers(container) {
         }
 
         const formHtml = `
-            <div class="form-group"><label class="form-label">Apartment</label><select class="form-select" id="mem-apt" ${role === 'caretaker' ? 'disabled' : ''}>${apartmentsHtml}</select></div>
+            <div class="form-group"><label class="form-label">Apartment</label><select class="form-select" id="mem-apt" ${role==='caretaker'?'disabled':''}>${apartmentsHtml}</select></div>
             <div class="form-group"><label class="form-label">Role</label><select class="form-select" id="mem-role">${rolesHtml}</select></div>
             <div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input class="form-input" id="mem-name" required></div>
             <div class="form-group"><label class="form-label">Phone <span class="required">*</span></label><input class="form-input" id="mem-phone" required></div>
@@ -276,7 +252,7 @@ export default async function staffMembers(container) {
         });
     }
 
-    // Create staff account (role = 'staff') using the dedicated endpoint
+    // Create staff account (role = 'staff')
     async function createStaffAccount(staffId, name, phone) {
         const { showFormModal } = await import('../../components/modal.js');
         const defaultPassword = phone.replace(/\D/g, '').slice(-6) || '123456';
@@ -294,16 +270,13 @@ export default async function staffMembers(container) {
             try {
                 await apiService.post('/staff/accounts', { staff_id: staffId, username, password });
                 showToast(`Account created! Username: ${username}`, 'success');
-                // Refresh user lists
-                const [sRes, cRes] = await Promise.all([apiService.get('/auth/users?role=staff'), apiService.get('/auth/users?role=caretaker')]);
-                if (sRes.success) staffUsers = sRes.data;
-                if (cRes.success) caretakerUsers = cRes.data;
-                loadMembers();
+                await refreshUserLists();      // update local cache
+                loadMembers();                 // re‑render → button becomes eye
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
     }
 
-    // Edit existing staff account (username/password)
+    // Edit existing staff/caretaker account
     async function editStaffAccount(staffId, name, phone, currentUsername) {
         const { showFormModal } = await import('../../components/modal.js');
         const existingUser = staffUsers.find(u => u.phone === phone) || caretakerUsers.find(u => u.phone === phone);
@@ -327,15 +300,13 @@ export default async function staffMembers(container) {
             try {
                 await apiService.put(`/auth/users/${existingUser.id}`, body);
                 showToast('Account updated', 'success');
-                const [sRes, cRes] = await Promise.all([apiService.get('/auth/users?role=staff'), apiService.get('/auth/users?role=caretaker')]);
-                if (sRes.success) staffUsers = sRes.data;
-                if (cRes.success) caretakerUsers = cRes.data;
+                await refreshUserLists();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
     }
 
-    // Create caretaker account (role = 'caretaker') – existing function, unchanged
+    // Create caretaker account (role = 'caretaker')
     async function createCaretakerAccount(staffId, name, phone) {
         const { showFormModal } = await import('../../components/modal.js');
         const defaultPassword = phone.replace(/\D/g, '').slice(-6) || '123456';
@@ -355,9 +326,7 @@ export default async function staffMembers(container) {
             try {
                 await apiService.post('/auth/register', { full_name: name, phone: phone, password, role: 'caretaker', username });
                 showToast(`Caretaker account created! Username: ${username}`, 'success');
-                const [sRes, cRes] = await Promise.all([apiService.get('/auth/users?role=staff'), apiService.get('/auth/users?role=caretaker')]);
-                if (sRes.success) staffUsers = sRes.data;
-                if (cRes.success) caretakerUsers = cRes.data;
+                await refreshUserLists();
                 loadMembers();
             } catch (e) { showToast(e.message, 'error'); return false; }
         });
