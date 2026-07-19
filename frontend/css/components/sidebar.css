@@ -24,6 +24,7 @@
 }
 
 .sidebar.collapsed .logo-text,
+.sidebar.collapsed .logo-image,
 .sidebar.collapsed .nav-text,
 .sidebar.collapsed .user-details,
 .sidebar.collapsed .badge,
@@ -62,13 +63,42 @@
     letter-spacing: -0.02em;
 }
 
+/* --- Logo Image (New!) --- */
+.sidebar-logo .logo-image {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    display: block;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Fallback: if image is missing, show the icon */
+.sidebar-logo .logo-image:not([src]),
+.sidebar-logo .logo-image[src=""],
+.sidebar-logo .logo-image[src="#"] {
+    display: none;
+}
+
 .sidebar-logo i {
     font-size: 1.5rem;
     color: var(--primary); /* Terracotta accent on the icon */
+    display: block;
 }
 
 .sidebar-logo span {
     color: var(--primary); /* Highlight "Bandaptai" or key part */
+}
+
+/* When collapsed, hide the logo image and keep only the icon (if any) */
+.sidebar.collapsed .sidebar-logo .logo-image {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-logo i {
+    display: block; /* Ensure the icon is visible when collapsed */
 }
 
 /* --- Toggle Button (Collapse/Expand) --- */
