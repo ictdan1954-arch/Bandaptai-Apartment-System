@@ -70,6 +70,14 @@ export default async function staffMembers(container) {
     let selectedAptId = defaultAptId || '';
     let selectedRoleId = '';
 
+    // If coming from Staff Roles page with a role parameter, pre‑select that role
+    const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const roleFromUrl = urlParams.get('role');
+    if (roleFromUrl && role === 'landlord') {
+        selectedRoleId = roleFromUrl;
+        if (filterRole) filterRole.value = roleFromUrl;
+    }
+
     async function loadMembers() {
         if (role === 'landlord') {
             selectedAptId = filterApt.value;
