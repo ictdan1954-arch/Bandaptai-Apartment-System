@@ -138,8 +138,6 @@ export default async function rentPayments(container) {
 
             // Summary calculations
             const totalCollected = payments.reduce((sum, p) => sum + parseFloat(p.amount_paid), 0);
-            // Expected rent for the period cannot be easily calculated here, we skip it for now.
-            // We'll show total collected, count, and average.
             const count = payments.length;
             const average = count ? Math.round(totalCollected / count) : 0;
 
@@ -222,8 +220,8 @@ export default async function rentPayments(container) {
         }
     }
 
-    // ---------- EDIT PAYMENT MODAL ----------
-    function openEditModal(data) {
+    // ---------- EDIT PAYMENT MODAL (fixed: added async) ----------
+    async function openEditModal(data) {
         const { showFormModal } = await import('../../components/modal.js');
         const formHtml = `
             <div class="form-group">
@@ -301,7 +299,7 @@ export default async function rentPayments(container) {
         });
     }
 
-    // ---------- RECORD PAYMENT MODAL (unchanged, but included for completeness) ----------
+    // ---------- RECORD PAYMENT MODAL ----------
     async function openRecordModal() {
         let tenantsQuery = '?status=active';
         if (role === 'caretaker' && defaultAptId) {
