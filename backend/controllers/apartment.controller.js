@@ -34,7 +34,7 @@ const apartmentController = {
         }
     },
 
-    // Get all apartments
+    // Get all apartments (with unit stats)
     async getAll(req, res) {
         try {
             let query = supabase.from('apartments').select('*');
@@ -57,6 +57,36 @@ const apartmentController = {
             const { data: apartments, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            // If there are apartments, fetch their unit stats
+            if (apartments && apartments.length > 0) {
+                const allApartmentIds = apartments.map(a => a.id);
+                const { data: units } = await supabase
+                    .from('units')
+                    .select('apartment_id, status')
+                    .in('apartment_id', allApartmentIds);
+
+                // Build counts per apartment
+                const counts = {};
+                (units || []).forEach(u => {
+                    if (!counts[u.apartment_id]) {
+                        counts[u.apartment_id] = { total: 0, occupied: 0 };
+                    }
+                    counts[u.apartment_id].total++;
+                    if (u.status === 'occupied') {
+                        counts[u.apartment_id].occupied++;
+                    }
+                });
+
+                // Attach counts to each apartment
+                const enriched = apartments.map(a => ({
+                    ...a,
+                    unit_count: counts[a.id]?.total || 0,
+                    occupied_count: counts[a.id]?.occupied || 0
+                }));
+
+                return ApiResponse.success(res, enriched);
+            }
 
             return ApiResponse.success(res, apartments);
         } catch (error) {
