@@ -2,7 +2,7 @@ const supabase = require('../config/supabase');
 const ApiResponse = require('../utils/response');
 
 const dashboardController = {
-    // Landlord dashboard
+    // Landlord dashboard (enhanced)
     async landlordDashboard(req, res) {
         try {
             const { data: apartments } = await supabase
@@ -11,6 +11,7 @@ const dashboardController = {
 
             const apartmentIds = apartments?.map(a => a.id) || [];
 
+            // ---------- overall unit stats ----------
             const { count: totalUnits } = await supabase
                 .from('units')
                 .select('*', { count: 'exact', head: true })
@@ -28,11 +29,15 @@ const dashboardController = {
                 .in('apartment_id', apartmentIds)
                 .eq('status', 'vacant');
 
+            const occupancyRate = totalUnits ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+
+            // ---------- active tenants count ----------
             const { count: activeTenants } = await supabase
                 .from('tenants')
                 .select('*', { count: 'exact', head: true })
                 .eq('status', 'active');
 
+            // ---------- expected monthly rent ----------
             const { data: allUnits } = await supabase
                 .from('units')
                 .select('monthly_rent')
@@ -44,6 +49,7 @@ const dashboardController = {
             const now = new Date();
             const firstOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
+            // ---------- rent collected this month ----------
             const { data: thisMonthPayments } = await supabase
                 .from('rent_payments')
                 .select('amount_paid')
@@ -52,6 +58,7 @@ const dashboardController = {
 
             const rentCollectedThisMonth = thisMonthPayments?.reduce((sum, p) => sum + parseFloat(p.amount_paid), 0) || 0;
 
+            // ---------- expenses this month ----------
             const { data: thisMonthExpenses } = await supabase
                 .from('expenses')
                 .select('amount')
@@ -60,11 +67,78 @@ const dashboardController = {
 
             const expensesThisMonth = thisMonthExpenses?.reduce((sum, e) => sum + parseFloat(e.amount), 0) || 0;
 
+            // ---------- total arrears (all active tenants) ----------
+            const { data: activeTenantsData } = await supabase
+                .from('tenants')
+                .select('id, lease_start_date, units!inner(monthly_rent)')
+                .eq('status', 'active');
+
+            let totalArrears = 0;
+            if (activeTenantsData) {
+                for (const tenant of activeTenantsData) {
+                    const { data: payments } = await supabase
+                        .from('rent_payments')
+                        .select('amount_paid')
+                        .eq('tenant_id', tenant.id);
+                    const totalPaid = payments?.reduce((sum, p) => sum + parseFloat(p.amount_paid), 0) || 0;
+                    const leaseStart = new Date(tenant.lease_start_date);
+                    const monthsDiff = (now.getFullYear() - leaseStart.getFullYear()) * 12 +
+                        (now.getMonth() - leaseStart.getMonth()) + 1;
+                    const expected = monthsDiff * parseFloat(tenant.units?.monthly_rent || 0);
+                    if (expected > totalPaid) totalArrears += (expected - totalPaid);
+                }
+            }
+
+            // ---------- pending maintenance ----------
             const { count: pendingMaintenance } = await supabase
                 .from('maintenance_requests')
                 .select('*', { count: 'exact', head: true })
                 .in('apartment_id', apartmentIds)
                 .in('status', ['reported', 'in_progress']);
+
+            // ---------- per‑apartment breakdown ----------
+            const apartmentsBreakdown = [];
+            for (const apt of apartments) {
+                const { count: aptUnits } = await supabase
+                    .from('units')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('apartment_id', apt.id);
+                const { count: aptOccupied } = await supabase
+                    .from('units')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('apartment_id', apt.id)
+                    .eq('status', 'occupied');
+                const { data: aptPayments } = await supabase
+                    .from('rent_payments')
+                    .select('amount_paid')
+                    .eq('apartment_id', apt.id)
+                    .gte('payment_date', firstOfMonth);
+                const aptRent = aptPayments?.reduce((sum, p) => sum + parseFloat(p.amount_paid), 0) || 0;
+
+                apartmentsBreakdown.push({
+                    id: apt.id,
+                    name: apt.name,
+                    status: apt.status,
+                    total_units: aptUnits || 0,
+                    occupied_units: aptOccupied || 0,
+                    rent_collected_this_month: aptRent
+                });
+            }
+
+            // ---------- recent activity ----------
+            const { data: recentRent } = await supabase
+                .from('rent_payments')
+                .select('amount_paid, payment_date, tenants(full_name), units(unit_number)')
+                .in('apartment_id', apartmentIds)
+                .order('payment_date', { ascending: false })
+                .limit(5);
+
+            const { data: recentMaintenance } = await supabase
+                .from('maintenance_requests')
+                .select('title, status, date_reported, units(unit_number)')
+                .in('apartment_id', apartmentIds)
+                .order('created_at', { ascending: false })
+                .limit(5);
 
             return ApiResponse.success(res, {
                 total_apartments: apartments?.length || 0,
@@ -76,10 +150,15 @@ const dashboardController = {
                 rent_collected_this_month: rentCollectedThisMonth,
                 expenses_this_month: expensesThisMonth,
                 pending_maintenance: pendingMaintenance || 0,
-                net_income_this_month: rentCollectedThisMonth - expensesThisMonth
+                net_income_this_month: rentCollectedThisMonth - expensesThisMonth,
+                occupancy_rate: occupancyRate,
+                total_arrears: totalArrears,
+                apartments_breakdown: apartmentsBreakdown,
+                recent_rent_payments: recentRent || [],
+                recent_maintenance: recentMaintenance || []
             });
         } catch (error) {
-            console.error('Dashboard error:', error);
+            console.error('Landlord dashboard error:', error);
             return ApiResponse.error(res, 'Failed to load dashboard');
         }
     },
