@@ -140,7 +140,7 @@ const staffController = {
     async getMembersWithAccounts(req, res) {
         try {
             const { apartmentId } = req.params;
-            const { role_id, search } = req.query;   // <-- FIX: accept filters
+            const { role_id, search } = req.query;
 
             let query = supabase
                 .from('staff_members')
@@ -335,6 +335,7 @@ const staffController = {
         }
     },
 
+    // Get salaries – now includes staff role
     async getSalaries(req, res) {
         try {
             const { apartmentId } = req.params;
@@ -342,7 +343,7 @@ const staffController = {
 
             let query = supabase
                 .from('staff_salaries')
-                .select('*, staff_members:staff_id(id, full_name)')
+                .select('*, staff_members:staff_id(id, full_name, staff_roles:staff_role_id(role_name))')
                 .eq('apartment_id', apartmentId);
 
             if (staff_id) query = query.eq('staff_id', staff_id);
@@ -356,6 +357,34 @@ const staffController = {
             return ApiResponse.success(res, salaries);
         } catch (error) {
             return ApiResponse.error(res, 'Failed to fetch salaries');
+        }
+    },
+
+    // Update salary payment
+    async updateSalary(req, res) {
+        try {
+            const { id } = req.params;
+            const updateData = {};
+
+            const allowedFields = ['amount_paid', 'payment_date', 'period_start', 'period_end', 'payment_method', 'notes'];
+            allowedFields.forEach(field => {
+                if (req.body[field] !== undefined) {
+                    updateData[field] = req.body[field];
+                }
+            });
+
+            const { data: salary, error } = await supabase
+                .from('staff_salaries')
+                .update(updateData)
+                .eq('id', id)
+                .select('*')
+                .single();
+
+            if (error) throw error;
+
+            return ApiResponse.success(res, salary, 'Salary payment updated');
+        } catch (error) {
+            return ApiResponse.error(res, 'Failed to update salary');
         }
     },
 
