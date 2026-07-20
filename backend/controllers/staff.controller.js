@@ -106,18 +106,25 @@ const staffController = {
         }
     },
 
+    // Get members – now supports 'all' for landlord
     async getMembers(req, res) {
         try {
             const { apartmentId } = req.params;
-            const { status, role_id } = req.query;
+            const { status, role_id, search } = req.query;
 
             let query = supabase
                 .from('staff_members')
-                .select('*, staff_roles:staff_role_id(id, role_name)')
-                .eq('apartment_id', apartmentId);
+                .select('*, staff_roles:staff_role_id(id, role_name), apartments:apartment_id(name)');
+
+            if (apartmentId !== 'all') {
+                query = query.eq('apartment_id', apartmentId);
+            } else if (req.user.role !== 'landlord') {
+                return ApiResponse.forbidden(res, 'Only landlord can view all staff');
+            }
 
             if (status) query = query.eq('status', status);
             if (role_id) query = query.eq('staff_role_id', role_id);
+            if (search) query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`);
 
             const { data: members, error } = await query.order('full_name');
 
@@ -129,16 +136,22 @@ const staffController = {
         }
     },
 
-    // NEW: Get members with account status for a specific apartment
+    // Get members with account status – supports 'all' for landlord
     async getMembersWithAccounts(req, res) {
         try {
             const { apartmentId } = req.params;
 
-            // Fetch staff members for the apartment
-            const { data: members, error } = await supabase
+            let query = supabase
                 .from('staff_members')
-                .select('*, staff_roles:staff_role_id(id, role_name)')
-                .eq('apartment_id', apartmentId);
+                .select('*, staff_roles:staff_role_id(id, role_name), apartments:apartment_id(name)');
+
+            if (apartmentId !== 'all') {
+                query = query.eq('apartment_id', apartmentId);
+            } else if (req.user.role !== 'landlord') {
+                return ApiResponse.forbidden(res, 'Only landlord can view all staff');
+            }
+
+            const { data: members, error } = await query;
 
             if (error) throw error;
 
