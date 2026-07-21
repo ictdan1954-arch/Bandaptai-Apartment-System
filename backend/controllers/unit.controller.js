@@ -6,7 +6,7 @@ const unitController = {
     // Create unit
     async create(req, res) {
         try {
-            const { apartment_id, unit_number, unit_type, monthly_rent, deposit_amount } = req.body;
+            const { apartment_id, unit_number, unit_type, monthly_rent, deposit_amount, water_deposit, electricity_deposit, general_deposit } = req.body;
             const missing = validateRequired(req.body, ['apartment_id', 'unit_number', 'unit_type', 'monthly_rent']);
             if (missing.length > 0) {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
@@ -31,7 +31,10 @@ const unitController = {
                     unit_number,
                     unit_type,
                     monthly_rent,
-                    deposit_amount: deposit_amount || 0
+                    deposit_amount: deposit_amount || 0,
+                    water_deposit: water_deposit || 0,
+                    electricity_deposit: electricity_deposit || 0,
+                    general_deposit: general_deposit || 0
                 }])
                 .select('*')
                 .single();
@@ -112,7 +115,7 @@ const unitController = {
             const { id } = req.params;
             const updateData = {};
 
-            const allowedFields = ['unit_number', 'unit_type', 'monthly_rent', 'deposit_amount', 'status'];
+            const allowedFields = ['unit_number', 'unit_type', 'monthly_rent', 'deposit_amount', 'status', 'water_deposit', 'electricity_deposit', 'general_deposit'];
             allowedFields.forEach(field => {
                 if (req.body[field] !== undefined) {
                     updateData[field] = req.body[field];
