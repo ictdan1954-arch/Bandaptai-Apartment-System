@@ -268,7 +268,7 @@ const dashboardController = {
         }
     },
 
-    // Tenant dashboard (enhanced with deposits, apartment name, announcements, next due date)
+       // Tenant dashboard (enhanced)
     async tenantDashboard(req, res) {
         try {
             const { data: tenant } = await supabase
@@ -323,6 +323,8 @@ const dashboardController = {
                 tenant: {
                     id: tenant.id,
                     full_name: tenant.full_name,
+                    phone: tenant.phone,          // ← added
+                    email: tenant.email,          // ← added
                     unit_number: tenant.units?.unit_number,
                     monthly_rent: tenant.units?.monthly_rent,
                     unit_id: tenant.unit_id,
@@ -348,7 +350,6 @@ const dashboardController = {
             return ApiResponse.error(res, 'Failed to load dashboard');
         }
     },
-
     // Staff dashboard
     async staffDashboard(req, res) {
         try {
