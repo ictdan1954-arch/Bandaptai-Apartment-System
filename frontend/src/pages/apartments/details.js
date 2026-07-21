@@ -3,6 +3,7 @@ import { authService } from '../../services/auth.service.js';
 import { formatDate, formatCurrency } from '../../utils/formatters.js';
 import { showToast } from '../../components/toast.js';
 import { router } from '../../router.js';
+import { openChatModal } from '../../components/chat.js';
 
 export default async function apartmentDetails(container, params) {
     const id = params.id;
@@ -72,9 +73,14 @@ export default async function apartmentDetails(container, params) {
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Caretakers</h3>
-                    <button class="btn btn-primary btn-sm" id="assign-caretaker-btn">
-                        <i class="fas fa-user-plus"></i> Assign Caretaker
-                    </button>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-primary btn-sm" id="assign-caretaker-btn">
+                            <i class="fas fa-user-plus"></i> Assign Caretaker
+                        </button>
+                        <button class="btn btn-outline btn-sm" id="msg-all-caretakers-btn">
+                            <i class="fas fa-envelope"></i> Message All
+                        </button>
+                    </div>
                 </div>
                 <div id="caretakers-list" class="table-container">
                     <div class="page-loader"><div class="spinner"></div></div>
@@ -85,6 +91,7 @@ export default async function apartmentDetails(container, params) {
         if (userRole === 'landlord') {
             loadCaretakers(id);
             document.getElementById('assign-caretaker-btn').addEventListener('click', () => openAssignCaretaker(id));
+            document.getElementById('msg-all-caretakers-btn').addEventListener('click', () => broadcastToAllCaretakers(id));
         }
     } catch (error) {
         container.innerHTML = `<div class="error-state"><h2>Error</h2><p>${error.message}</p></div>`;
@@ -173,7 +180,7 @@ async function loadCaretakers(apartmentId) {
             if (msgBtn) {
                 const userId = msgBtn.dataset.userId;
                 const fullName = msgBtn.dataset.fullName;
-                openChatWithCaretaker(userId, fullName, apartmentId);
+                openChatModal(authService.user?.id, userId, fullName, apartmentId);
                 return;
             }
 
@@ -191,12 +198,134 @@ async function loadCaretakers(apartmentId) {
     }
 }
 
-async function openChatWithCaretaker(partnerId, partnerName, apartmentId) {
-    // Dynamically import the chat modal
-    const { openChatModal } = await import('../../components/chat.js');
-    openChatModal(authService.user?.id, partnerId, partnerName, apartmentId);
+async function broadcastToAllCaretakers(apartmentId) {
+    const { showFormModal } = await import('../../components/modal.js');
+    const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Message</label>
+            <textarea class="form-textarea" id="broadcast-msg" rows="4" placeholder="Type your message to all caretakers of this apartment..."></textarea>
+        </div>`;
+    showFormModal('Message All Caretakers', formHtml, async (overlay) => {
+        const message = overlay.querySelector('#broadcast-msg').value.trim();
+        if (!message) {
+            showToast('Message is required', 'error');
+            return false;
+        }
+        try {
+            const res = await apiService.post('/messages/broadcast', {
+                role: 'caretaker',
+                apartment_id: apartmentId,
+                message
+            });
+            showToast(res.message || 'Broadcast sent!', 'success');
+        } catch (e) {
+            showToast(e.message, 'error');
+            return false;
+        }
+    });
 }
 
-// The remaining functions (openAssignCaretaker, editCaretakerAccount, removeCaretakerHandler) stay unchanged
-// ...
-// (they are exactly the same as in the previous version, omitted for brevity)
+async function openAssignCaretaker(apartmentId) {
+    const usersRes = await apiService.get('/auth/users?role=caretaker');
+    if (!usersRes.success) {
+        showToast('Failed to load caretakers', 'error');
+        return;
+    }
+
+    const caretakers = usersRes.data;
+    if (caretakers.length === 0) {
+        showToast('No caretaker accounts exist. Create one from Staff Members first.', 'warning');
+        return;
+    }
+
+    const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Select Caretaker</label>
+            <select class="form-select" id="caretaker-select">
+                ${caretakers.map(u => `<option value="${u.id}">${u.full_name} (${u.username || u.phone})</option>`).join('')}
+            </select>
+        </div>`;
+
+    const { showFormModal } = await import('../../components/modal.js');
+    showFormModal('Assign Caretaker', formHtml, async (overlay) => {
+        const userId = overlay.querySelector('#caretaker-select').value;
+        try {
+            await apiService.post(`/apartments/${apartmentId}/caretakers`, { user_id: userId });
+            showToast('Caretaker assigned successfully', 'success');
+            loadCaretakers(apartmentId);
+        } catch (e) {
+            showToast(e.message, 'error');
+            return false;
+        }
+    });
+}
+
+async function editCaretakerAccount(userId, currentName, currentUsername, apartmentId) {
+    const { showFormModal } = await import('../../components/modal.js');
+    const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-input" id="edit-user-username" value="${currentUsername}" placeholder="Enter username">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" id="edit-user-name" value="${currentName}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">New Password (leave blank to keep current)</label>
+            <div style="position: relative;">
+                <input type="password" class="form-input" id="edit-user-password" placeholder="Min 6 characters" style="padding-right: 40px;">
+                <button type="button" class="password-toggle" 
+                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px 8px;"
+                        onclick="const pwd = document.getElementById('edit-user-password'); 
+                                 if(pwd.type === 'password') { pwd.type = 'text'; this.innerHTML = '<i class=\\'fas fa-eye-slash\\'></i>'; } 
+                                 else { pwd.type = 'password'; this.innerHTML = '<i class=\\'fas fa-eye\\'></i>'; }">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+        </div>
+        <p class="text-muted">Leave password empty if you only want to change the name/username.</p>`;
+
+    showFormModal('Edit Caretaker Account', formHtml, async (overlay) => {
+        const username = overlay.querySelector('#edit-user-username').value.trim();
+        const full_name = overlay.querySelector('#edit-user-name').value.trim();
+        const password = overlay.querySelector('#edit-user-password').value.trim();
+
+        if (!full_name) {
+            showToast('Name is required', 'error');
+            return false;
+        }
+
+        const body = { full_name };
+        if (username) body.username = username;
+        if (password) {
+            if (password.length < 6) {
+                showToast('Password must be at least 6 characters', 'error');
+                return false;
+            }
+            body.password = password;
+        }
+
+        try {
+            await apiService.put(`/auth/users/${userId}`, body);
+            showToast('Caretaker account updated!', 'success');
+            loadCaretakers(apartmentId);
+        } catch (e) {
+            showToast(e.message, 'error');
+            return false;
+        }
+    });
+}
+
+async function removeCaretakerHandler(assignmentId, apartmentId) {
+    const { showConfirm } = await import('../../components/modal.js');
+    showConfirm('Remove Caretaker', 'Are you sure you want to remove this caretaker from the apartment?', async () => {
+        try {
+            await apiService.delete(`/apartments/caretakers/${assignmentId}`);
+            showToast('Caretaker removed', 'success');
+            loadCaretakers(apartmentId);
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    });
+}
