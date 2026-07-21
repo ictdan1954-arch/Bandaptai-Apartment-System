@@ -1,5 +1,5 @@
 /* =============================================
-   TABLES - ESTATE CALM
+   TABLES - RIKIM APARTMENTS MODERN HERITAGE
    Scannable, warm, and beautifully organized.
    ============================================= */
 
@@ -56,7 +56,7 @@
 }
 
 .table tbody tr:hover {
-    background: var(--primary-bg); /* Warm peach glow instead of cold grey */
+    background: var(--primary-bg); /* Soft slate blue glow */
     cursor: default;
 }
 
@@ -179,7 +179,7 @@
 .pagination-btn.active {
     background: var(--primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(212, 132, 90, 0.3);
+    box-shadow: 0 4px 12px rgba(94, 122, 142, 0.30);
     border-color: var(--primary);
 }
 
