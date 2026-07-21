@@ -14,7 +14,16 @@ export async function openProfileModal() {
         </div>
         <div class="form-group">
             <label class="form-label">New Password (leave blank to keep current)</label>
-            <input type="password" class="form-input" id="profile-password" placeholder="Min 6 characters">
+            <div style="position: relative;">
+                <input type="password" class="form-input" id="profile-password" placeholder="Min 6 characters" style="padding-right: 40px;">
+                <button type="button" class="password-toggle" 
+                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer;"
+                        onclick="const pwd = document.getElementById('profile-password'); 
+                                 if(pwd.type === 'password') { pwd.type = 'text'; this.innerHTML = '<i class=\\'fas fa-eye-slash\\'></i>'; } 
+                                 else { pwd.type = 'password'; this.innerHTML = '<i class=\\'fas fa-eye\\'></i>'; }">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
         </div>
         <div class="form-group">
             <label class="form-label">Profile Photo</label>
@@ -36,8 +45,6 @@ export async function openProfileModal() {
         try {
             // Upload photo if selected
             if (photoFile) {
-                const formData = new FormData();
-                formData.append('photo', photoFile);
                 const uploadRes = await apiService.uploadFile('/upload/profile-photo', photoFile);
                 if (uploadRes.success) {
                     body.profile_photo = uploadRes.data.url;
@@ -59,7 +66,7 @@ export async function openProfileModal() {
                     updateSidebarUserInfo();
                 }
             } else if (photoFile) {
-                // Already uploaded photo but no other changes – reload to reflect photo
+                // Only the photo was changed – fetch updated user to get the new photo URL
                 const updatedUser = await apiService.get('/auth/profile');
                 if (updatedUser.success) {
                     authService.user = updatedUser.data;
