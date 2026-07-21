@@ -5,8 +5,6 @@ import { showToast } from '../components/toast.js';
 export default async function loginPage(container) {
     container.innerHTML = `
         <div class="auth-container">
-            <!-- Slideshow background layer -->
-            <div class="slideshow"></div>
             <div class="auth-card">
                 <div class="auth-logo">
                     <img src="assets/images/logo.png" alt="Rikim Apartments" 
@@ -50,7 +48,6 @@ export default async function loginPage(container) {
             </div>
         </div>
         <style>
-            /* ============ SLIDESHOW BACKGROUND ============ */
             .auth-container {
                 display: flex;
                 align-items: center;
@@ -59,33 +56,15 @@ export default async function loginPage(container) {
                 padding: 20px;
                 position: relative;
                 overflow: hidden;
-                background: #0f172a;  /* fallback if images don't load */
-            }
-
-            /* The slideshow layer */
-            .slideshow {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%;
-                height: 100%;
+                /* Single background photo with dark overlay */
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 58, 95, 0.6) 50%, rgba(37, 99, 235, 0.5) 100%),
+                            url('assets/images/login-splash01.jpg');
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
-                animation: slideShow 15s infinite;
-                z-index: 0;
-                /* Dark overlay to keep the white card readable */
-                filter: brightness(0.4);
             }
 
-            /* Online stock photos – they load instantly */
-            @keyframes slideShow {
-                0%, 30%   { background-image: url('https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80'); }
-                33%, 63%  { background-image: url('https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80'); }
-                66%, 96%  { background-image: url('https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80'); }
-                100%      { background-image: url('https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80'); }
-            }
-
-            /* Subtle rotating gradient on top of the slideshow for depth */
+            /* Subtle rotating gradient for depth */
             .auth-container::after {
                 content: '';
                 position: absolute;
@@ -105,7 +84,6 @@ export default async function loginPage(container) {
                 to { transform: rotate(360deg); }
             }
 
-            /* ============ LOGIN CARD ============ */
             .auth-card {
                 background: rgba(255, 255, 255, 0.97);
                 backdrop-filter: blur(20px);
