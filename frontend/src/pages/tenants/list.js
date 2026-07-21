@@ -3,6 +3,7 @@ import { authService } from '../../services/auth.service.js';
 import { formatCurrency, formatDate, capitalize } from '../../utils/formatters.js';
 import { router } from '../../router.js';
 import { showToast } from '../../components/toast.js';
+import { openChatModal } from '../../components/chat.js';
 
 export default async function tenantsList(container) {
     const role = authService.getRole();
@@ -147,12 +148,24 @@ export default async function tenantsList(container) {
                                     <div class="table-actions">
                                         <button onclick="window.router.navigate('/tenants/${t.id}')"><i class="fas fa-eye"></i></button>
                                         <button onclick="window.editTenant('${t.id}')"><i class="fas fa-edit"></i></button>
+                                        <button class="msg-tenant-btn" data-user-id="${t.user_id}" data-name="${t.full_name}" title="Message"><i class="fas fa-envelope"></i></button>
                                     </div>
                                 </td>
                             </tr>`;
                         }).join('')}
                     </tbody>
                 </table>`;
+
+            // Attach message button listeners
+            document.querySelectorAll('.msg-tenant-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const userId = btn.dataset.userId;
+                    const name = btn.dataset.name;
+                    openChatModal(authService.user?.id, userId, name);
+                });
+            });
+
             window.editTenant = editTenant;
         } catch (error) {
             document.getElementById('tenants-table').innerHTML = `<div class="error-state"><p>${error.message}</p></div>`;
@@ -166,7 +179,6 @@ async function editTenant(id) {
     const t = response.data;
     const { showFormModal } = await import('../../components/modal.js');
 
-    // Show move-out fields only if already moved out or if we want to allow setting them
     const showMoveOutFields = t.status === 'moved_out' || t.move_out_date;
 
     const formHtml = `
