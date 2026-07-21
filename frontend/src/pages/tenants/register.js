@@ -73,6 +73,14 @@ export default async function registerTenant(container) {
                         <label class="form-label">Deposit Paid (KES)</label>
                         <input type="number" class="form-input" id="t-deposit" value="0" min="0">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Water Deposit (KES)</label>
+                        <input type="number" class="form-input" id="t-water-deposit" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Electricity Deposit (KES)</label>
+                        <input type="number" class="form-input" id="t-electricity-deposit" value="0" min="0">
+                    </div>
                 </div>
                 <div class="mt-2" style="display:flex; gap:12px; justify-content:flex-end;">
                     <button type="button" class="btn btn-secondary" onclick="window.router.navigate('/tenants')">Cancel</button>
@@ -134,7 +142,9 @@ export default async function registerTenant(container) {
             id_number: document.getElementById('t-idnumber').value.trim(),
             unit_id: document.getElementById('t-unit').value,
             lease_start_date: document.getElementById('t-start').value,
-            deposit_paid: parseFloat(document.getElementById('t-deposit').value) || 0
+            deposit_paid: parseFloat(document.getElementById('t-deposit').value) || 0,
+            water_deposit: parseFloat(document.getElementById('t-water-deposit').value) || 0,
+            electricity_deposit: parseFloat(document.getElementById('t-electricity-deposit').value) || 0
         };
 
         if (!data.full_name || !data.phone || !data.unit_id) {
