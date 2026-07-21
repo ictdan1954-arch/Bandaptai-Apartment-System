@@ -66,10 +66,11 @@ class ApiService {
         return this.request(endpoint, { method: 'DELETE' });
     }
 
+    // ---------- FILE UPLOAD (field name must be "photo") ----------
     async uploadFile(endpoint, file) {
         const url = `${this.baseUrl}${endpoint}`;
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('photo', file);   // ← must match backend: multer expects 'photo'
 
         const token = this.getToken();
         const headers = {};
