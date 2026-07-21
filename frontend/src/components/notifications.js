@@ -1,5 +1,6 @@
 import { apiService } from '../services/api.service.js';
 import { authService } from '../services/auth.service.js';
+import { router } from '../router.js';
 
 export function setupNotifications() {
     const bell = document.getElementById('notification-bell');
@@ -91,7 +92,7 @@ async function loadNotifications(dropdown) {
         const response = await apiService.get('/notifications');
         if (response.success && response.data.length > 0) {
             dropdown.querySelector('.notification-list').innerHTML = response.data.map(n => `
-                <div class="notification-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
+                <div class="notification-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" data-link="${n.link || ''}" data-type="${n.type || ''}">
                     <div class="notification-item-icon" style="background: var(--primary-bg); color: var(--primary);">
                         <i class="fas fa-bell"></i>
                     </div>
@@ -103,12 +104,39 @@ async function loadNotifications(dropdown) {
                 </div>
             `).join('');
 
-            // Click to mark as read
+            // Click handlers for each notification
             dropdown.querySelectorAll('.notification-item').forEach(item => {
-                item.addEventListener('click', async () => {
+                item.addEventListener('click', async (e) => {
                     const id = item.dataset.id;
-                    await apiService.put(`/notifications/${id}/read`);
-                    item.classList.remove('unread');
+                    const link = item.dataset.link;
+
+                    // Mark as read
+                    try {
+                        await apiService.put(`/notifications/${id}/read`);
+                        item.classList.remove('unread');
+                        // Update badge after a short delay
+                        setTimeout(fetchNotifications, 300);
+                    } catch (err) { /* ignore */ }
+
+                    // Close dropdown
+                    dropdown.classList.remove('open');
+
+                    // Handle navigation
+                    if (link) {
+                        // If it's a message notification, open the chat modal
+                        if (link.startsWith('/messages?partner=')) {
+                            const partnerId = link.split('=')[1];
+                            // We need the sender's name; we can extract it from the notification title or message.
+                            // The message text is like "landlord sent you a message: ..."
+                            // We'll just use the role as fallback.
+                            const senderRole = item.querySelector('.notification-item-message').textContent.split(' sent you')[0] || 'User';
+                            const { openChatModal } = await import('./chat.js');
+                            openChatModal(authService.user?.id, partnerId, senderRole);
+                        } else {
+                            // Navigate to the specified hash route
+                            window.location.hash = link;
+                        }
+                    }
                 });
             });
         } else {
