@@ -25,6 +25,10 @@ export default async function tenantsList(container) {
                     <button class="btn btn-primary" onclick="window.router.navigate('/tenants/register')">
                         <i class="fas fa-plus"></i> Register Tenant
                     </button>
+                    ${role === 'caretaker' ? `
+                    <button class="btn btn-outline btn-sm" id="msg-all-tenants-btn">
+                        <i class="fas fa-envelope"></i> Message All Tenants
+                    </button>` : ''}
                 </div>
             </div>
             <div class="filter-bar">
@@ -57,6 +61,36 @@ export default async function tenantsList(container) {
     const searchInput = container.querySelector('#tenant-search');
     const apartmentFilter = role === 'landlord' ? container.querySelector('#apartment-filter') : null;
     const statusFilter = container.querySelector('#status-filter');
+
+    // Broadcast button (caretaker only)
+    if (role === 'caretaker') {
+        document.getElementById('msg-all-tenants-btn')?.addEventListener('click', () => {
+            import('../../components/modal.js').then(({ showFormModal }) => {
+                const formHtml = `
+                    <div class="form-group">
+                        <label class="form-label">Message</label>
+                        <textarea class="form-textarea" id="broadcast-msg" rows="4" placeholder="Type your message to all active tenants..."></textarea>
+                    </div>`;
+                showFormModal('Message All Tenants', formHtml, async (overlay) => {
+                    const message = overlay.querySelector('#broadcast-msg').value.trim();
+                    if (!message) {
+                        showToast('Message is required', 'error');
+                        return false;
+                    }
+                    try {
+                        const res = await apiService.post('/messages/broadcast', {
+                            role: 'tenant',
+                            message
+                        });
+                        showToast(res.message || 'Broadcast sent!', 'success');
+                    } catch (e) {
+                        showToast(e.message, 'error');
+                        return false;
+                    }
+                });
+            });
+        });
+    }
 
     let searchTimeout;
     searchInput.addEventListener('input', () => {
