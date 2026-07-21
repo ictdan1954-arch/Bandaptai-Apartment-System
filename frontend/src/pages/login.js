@@ -9,8 +9,8 @@ export default async function loginPage(container) {
                 <div class="auth-logo">
                     <img src="assets/images/logo.png" alt="Rikim Apartments" 
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
-                         style="max-height:80px; margin-bottom:16px;">
-                    <div class="logo-icon" style="display:none;">
+                         style="max-height:120px; margin-bottom:16px;">
+                    <div class="logo-icon" style="display:none; width:80px; height:80px;">
                         <i class="fas fa-building"></i>
                     </div>
                     <h1>Rikim Apartments</h1>
@@ -94,8 +94,8 @@ export default async function loginPage(container) {
                 margin-bottom: 32px;
             }
             .logo-icon {
-                width: 64px;
-                height: 64px;
+                width: 80px;
+                height: 80px;
                 background: linear-gradient(135deg, var(--primary), var(--primary-dark));
                 border-radius: 18px;
                 display: inline-flex;
@@ -105,7 +105,7 @@ export default async function loginPage(container) {
                 box-shadow: 0 10px 20px rgba(37,99,235,0.3);
             }
             .logo-icon i {
-                font-size: 2rem;
+                font-size: 2.5rem;
                 color: white;
             }
             .auth-logo h1 {
