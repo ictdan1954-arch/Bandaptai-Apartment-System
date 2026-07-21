@@ -58,12 +58,19 @@ export default async function tenantDetails(container, params) {
                 <div class="mt-2">
                     <p><strong>Monthly Rent:</strong> ${formatCurrency(tenant.units?.monthly_rent || 0)}</p>
                     <p><strong>Deposit Paid:</strong> ${formatCurrency(tenant.deposit_paid || 0)}</p>
+                    <p><strong>Water Deposit:</strong> ${formatCurrency(tenant.water_deposit || 0)}</p>
+                    <p><strong>Electricity Deposit:</strong> ${formatCurrency(tenant.electricity_deposit || 0)}</p>
                     ${tenant.id_number ? `<p><strong>ID Number:</strong> ${tenant.id_number}</p>` : ''}
+                    ${tenant.move_out_date ? `<p><strong>Move Out Date:</strong> ${formatDate(tenant.move_out_date)}</p>` : ''}
+                    ${tenant.move_out_reason ? `<p><strong>Reason:</strong> ${tenant.move_out_reason}</p>` : ''}
                 </div>
                 ${tenant.status === 'active' ? `
-                <div style="display:flex; gap:12px; margin-top: 16px;">
+                <div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;">
                     <button class="btn btn-outline" id="change-unit-btn">
                         <i class="fas fa-exchange-alt"></i> Change Unit
+                    </button>
+                    <button class="btn btn-outline" id="move-out-btn">
+                        <i class="fas fa-sign-out-alt"></i> Move Out / Transfer
                     </button>
                     ${id ? `
                     <button class="btn btn-outline" id="show-credentials-btn">
@@ -99,9 +106,10 @@ export default async function tenantDetails(container, params) {
                 </div>
             </div>`;
 
-        // Event listeners
+        // Event listeners for the active tenant buttons
         if (tenant.status === 'active') {
             document.getElementById('change-unit-btn').addEventListener('click', () => openChangeUnitModal(tenant));
+            document.getElementById('move-out-btn').addEventListener('click', () => openMoveOutModal(tenant));
             if (id) {
                 document.getElementById('show-credentials-btn').addEventListener('click', () => showCredentialsModal(tenant));
             }
@@ -214,7 +222,6 @@ async function openChangeUnitModal(tenant) {
 async function showCredentialsModal(tenant) {
     const { showFormModal } = await import('../../components/modal.js');
 
-    // The tenant object should contain user.username from the updated backend
     const username = tenant.user?.username || 'Unknown';
     const defaultPasswordHint = tenant.phone ? tenant.phone.replace(/\D/g, '').slice(-6) || '123456' : '123456';
 
@@ -239,4 +246,108 @@ async function showCredentialsModal(tenant) {
             }
         }
     });
+}
+
+// Move Out / Transfer modal
+async function openMoveOutModal(tenant) {
+    const { showFormModal } = await import('../../components/modal.js');
+    const formHtml = `
+        <div class="form-group">
+            <label class="form-label">Action</label>
+            <select class="form-select" id="move-action">
+                <option value="move_out">Move Out (End Tenancy)</option>
+                <option value="transfer">Transfer to Another Unit</option>
+            </select>
+        </div>
+        <div id="move-out-options">
+            <div class="form-group">
+                <label class="form-label">Move Out Date</label>
+                <input type="date" class="form-input" id="move-out-date" value="${new Date().toISOString().split('T')[0]}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reason (optional)</label>
+                <input type="text" class="form-input" id="move-out-reason" placeholder="Reason for leaving">
+            </div>
+        </div>
+        <div id="transfer-options" style="display:none;">
+            <div class="form-group">
+                <label class="form-label">Select New Unit</label>
+                <select class="form-select" id="transfer-unit">
+                    <option value="">Loading…</option>
+                </select>
+            </div>
+        </div>`;
+
+    showFormModal('Move Out / Transfer', formHtml, async (overlay) => {
+        const actionSelect = overlay.querySelector('#move-action');
+        const moveOutOptions = overlay.querySelector('#move-out-options');
+        const transferOptions = overlay.querySelector('#transfer-options');
+        const transferUnitSelect = overlay.querySelector('#transfer-unit');
+
+        actionSelect.addEventListener('change', () => {
+            if (actionSelect.value === 'move_out') {
+                moveOutOptions.style.display = 'block';
+                transferOptions.style.display = 'none';
+            } else {
+                moveOutOptions.style.display = 'none';
+                transferOptions.style.display = 'block';
+                loadVacantUnits(tenant, transferUnitSelect);
+            }
+        });
+
+        // If transfer is selected initially, load units
+        if (actionSelect.value === 'transfer') {
+            loadVacantUnits(tenant, transferUnitSelect);
+        }
+
+        // On save (the modal's confirm button calls this callback)
+        if (actionSelect.value === 'move_out') {
+            const updates = {
+                status: 'moved_out',
+                move_out_date: overlay.querySelector('#move-out-date').value,
+                move_out_reason: overlay.querySelector('#move-out-reason').value.trim()
+            };
+            try {
+                await apiService.put(`/tenants/${tenant.id}`, updates);
+                showToast('Tenant moved out', 'success');
+                location.reload();
+            } catch (e) {
+                showToast(e.message, 'error');
+                return false;
+            }
+        } else {
+            const newUnitId = transferUnitSelect.value;
+            if (!newUnitId) {
+                showToast('Please select a unit', 'error');
+                return false;
+            }
+            try {
+                await apiService.put(`/tenants/${tenant.id}`, { unit_id: newUnitId });
+                showToast('Tenant transferred', 'success');
+                location.reload();
+            } catch (e) {
+                showToast(e.message, 'error');
+                return false;
+            }
+        }
+    });
+}
+
+async function loadVacantUnits(tenant, selectElement) {
+    let apartmentId = tenant.units?.apartment_id;
+    if (authService.getRole() === 'caretaker') {
+        const aptRes = await apiService.get('/apartments');
+        if (aptRes.success && aptRes.data.length > 0) apartmentId = aptRes.data[0].id;
+    }
+    try {
+        const unitsRes = await apiService.get(`/units/apartment/${apartmentId}`);
+        const vacantUnits = unitsRes.success ? unitsRes.data.filter(u => u.status === 'vacant') : [];
+        if (vacantUnits.length === 0) {
+            selectElement.innerHTML = '<option value="">No vacant units</option>';
+        } else {
+            selectElement.innerHTML = vacantUnits.map(u => `<option value="${u.id}">${u.unit_number} - ${capitalize(u.unit_type)} (KES ${u.monthly_rent})</option>`).join('');
+        }
+    } catch (e) {
+        selectElement.innerHTML = '<option value="">Error loading units</option>';
+    }
 }
