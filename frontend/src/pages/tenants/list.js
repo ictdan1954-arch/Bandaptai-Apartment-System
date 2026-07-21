@@ -7,13 +7,11 @@ import { showToast } from '../../components/toast.js';
 export default async function tenantsList(container) {
     const role = authService.getRole();
 
-    // Fetch apartments for filter (landlord sees all, caretaker sees assigned – already scoped by backend)
     let apartments = [];
     if (role === 'landlord') {
         const aptRes = await apiService.get('/apartments');
         if (aptRes.success) apartments = aptRes.data;
     } else {
-        // Caretaker's apartments are already scoped when fetching tenants, but we can still use the list for info
         const aptRes = await apiService.get('/apartments');
         if (aptRes.success) apartments = aptRes.data;
     }
@@ -86,7 +84,6 @@ export default async function tenantsList(container) {
             const table = document.getElementById('tenants-table');
             const summaryDiv = document.getElementById('tenants-summary');
 
-            // Summary counts
             const activeCount = tenants.filter(t => t.status === 'active').length;
             const movedOutCount = tenants.filter(t => t.status === 'moved_out').length;
             const blacklistedCount = tenants.filter(t => t.status === 'blacklisted').length;
@@ -126,15 +123,25 @@ export default async function tenantsList(container) {
             table.innerHTML = `
                 <table class="table">
                     <thead>
-                        <tr><th>Name</th><th>Phone</th><th>Unit</th><th>Rent</th><th>Status</th><th>Actions</th></tr>
+                        <tr>
+                            <th>Name</th><th>Phone</th><th>Unit</th><th>Rent</th>
+                            <th>Deposits</th>
+                            <th>Move Out</th>
+                            <th>Status</th><th>Actions</th>
+                        </tr>
                     </thead>
                     <tbody>
-                        ${tenants.map(t => `
+                        ${tenants.map(t => {
+                            const totalDeposits = parseFloat(t.deposit_paid || 0) + parseFloat(t.water_deposit || 0) + parseFloat(t.electricity_deposit || 0);
+                            const moveOutDate = t.move_out_date ? formatDate(t.move_out_date) : (t.status === 'moved_out' ? 'N/A' : '–');
+                            return `
                             <tr>
                                 <td><strong>${t.full_name}</strong></td>
                                 <td>${t.phone}</td>
                                 <td>${t.units ? `${t.units.unit_number} - ${t.units.apartments?.name || ''}` : '-'}</td>
                                 <td>${formatCurrency(t.units?.monthly_rent || 0)}</td>
+                                <td>${totalDeposits > 0 ? formatCurrency(totalDeposits) : '–'}</td>
+                                <td>${moveOutDate}</td>
                                 <td><span class="badge badge-${t.status === 'active' ? 'success' : t.status === 'moved_out' ? 'warning' : 'danger'}">${t.status}</span></td>
                                 <td>
                                     <div class="table-actions">
@@ -142,7 +149,8 @@ export default async function tenantsList(container) {
                                         <button onclick="window.editTenant('${t.id}')"><i class="fas fa-edit"></i></button>
                                     </div>
                                 </td>
-                            </tr>`).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>`;
             window.editTenant = editTenant;
@@ -157,6 +165,10 @@ async function editTenant(id) {
     if (!response.success) return;
     const t = response.data;
     const { showFormModal } = await import('../../components/modal.js');
+
+    // Show move-out fields only if already moved out or if we want to allow setting them
+    const showMoveOutFields = t.status === 'moved_out' || t.move_out_date;
+
     const formHtml = `
         <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-input" id="edit-t-name" value="${t.full_name}"></div>
         <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="edit-t-phone" value="${t.phone}"></div>
@@ -164,15 +176,36 @@ async function editTenant(id) {
             <option value="active" ${t.status==='active'?'selected':''}>Active</option>
             <option value="moved_out" ${t.status==='moved_out'?'selected':''}>Moved Out</option>
             <option value="blacklisted" ${t.status==='blacklisted'?'selected':''}>Blacklisted</option>
-        </select></div>`;
+        </select></div>
+        <div class="form-group"><label class="form-label">General Deposit (KES)</label><input type="number" class="form-input" id="edit-deposit" value="${t.deposit_paid || 0}" step="100" min="0"></div>
+        <div class="form-group"><label class="form-label">Water Deposit (KES)</label><input type="number" class="form-input" id="edit-water-deposit" value="${t.water_deposit || 0}" step="100" min="0"></div>
+        <div class="form-group"><label class="form-label">Electricity Deposit (KES)</label><input type="number" class="form-input" id="edit-electricity-deposit" value="${t.electricity_deposit || 0}" step="100" min="0"></div>
+        ${showMoveOutFields ? `
+        <div class="form-group"><label class="form-label">Move Out Date</label><input type="date" class="form-input" id="edit-move-out-date" value="${t.move_out_date || ''}"></div>
+        <div class="form-group"><label class="form-label">Move Out Reason</label><input type="text" class="form-input" id="edit-move-out-reason" value="${t.move_out_reason || ''}"></div>` : ''}
+    `;
+
     showFormModal('Edit Tenant', formHtml, async (overlay) => {
         const updates = {
-            full_name: overlay.querySelector('#edit-t-name').value,
-            phone: overlay.querySelector('#edit-t-phone').value,
-            status: overlay.querySelector('#edit-t-status').value
+            full_name: overlay.querySelector('#edit-t-name').value.trim(),
+            phone: overlay.querySelector('#edit-t-phone').value.trim(),
+            status: overlay.querySelector('#edit-t-status').value,
+            deposit_paid: parseFloat(overlay.querySelector('#edit-deposit').value) || 0,
+            water_deposit: parseFloat(overlay.querySelector('#edit-water-deposit').value) || 0,
+            electricity_deposit: parseFloat(overlay.querySelector('#edit-electricity-deposit').value) || 0,
         };
-        await apiService.put(`/tenants/${id}`, updates);
-        showToast('Tenant updated', 'success');
-        location.reload();
+
+        if (showMoveOutFields) {
+            updates.move_out_date = overlay.querySelector('#edit-move-out-date').value;
+            updates.move_out_reason = overlay.querySelector('#edit-move-out-reason').value.trim();
+        }
+
+        try {
+            await apiService.put(`/tenants/${id}`, updates);
+            showToast('Tenant updated', 'success');
+            location.reload();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
     });
 }
