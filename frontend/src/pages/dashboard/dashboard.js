@@ -149,6 +149,9 @@ function renderAdminDashboard(container, data, role) {
             </div>`}
         </div>
 
+        <!-- Unpaid Card Container (hidden by default) -->
+        <div class="dashboard-stats mt-2" id="unpaid-card-container" style="display:none;"></div>
+
         <!-- Landlord: Per‑Apartment Breakdown -->
         ${isLandlord && apartmentsBreakdown.length > 0 ? `
         <div class="card mb-2">
@@ -250,10 +253,22 @@ function renderAdminDashboard(container, data, role) {
         </div>` : ''}
     `;
 
-    // If caretaker, fetch apartment details (unchanged)
+    // If caretaker, fetch apartment details
     if (role === 'caretaker') {
         fetchCaretakerApartments();
     }
+
+    // Determine apartment ID for unpaid count (for caretaker, use first assigned apartment)
+    let defaultAptId = null;
+    if (role === 'caretaker' && data.apartments_breakdown && data.apartments_breakdown.length) {
+        defaultAptId = data.apartments_breakdown[0].id;
+    } else if (role === 'landlord') {
+        // For landlord, we can pass null to get all unpaid across all apartments
+        defaultAptId = null;
+    }
+
+    // Call loadUnpaidCount
+    loadUnpaidCount(defaultAptId);
 }
 
 async function fetchCaretakerApartments() {
@@ -282,6 +297,26 @@ async function fetchCaretakerApartments() {
     } catch (e) {
         const el = document.getElementById('caretaker-apartments');
         if (el) el.innerHTML = `<p class="text-muted p-2">Could not load apartments.</p>`;
+    }
+}
+
+// ----- NEW: Load unpaid tenants count and display card -----
+async function loadUnpaidCount(apartmentId) {
+    try {
+        const res = await apiService.get(`/rent/payment-status/${apartmentId || 'all'}`);
+        if (res.success && res.data.unpaid_tenants > 0) {
+            document.getElementById('unpaid-card-container').innerHTML = `
+                <div class="stat-card" style="border-left: 4px solid var(--danger); cursor:pointer;" onclick="window.router.navigate('/payments/rent')">
+                    <div class="stat-icon danger"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-label">Unpaid This Month</div>
+                        <div class="stat-value">${res.data.unpaid_tenants} tenant${res.data.unpaid_tenants > 1 ? 's' : ''}</div>
+                    </div>
+                </div>`;
+            document.getElementById('unpaid-card-container').style.display = 'flex';
+        }
+    } catch (e) {
+        // Silently fail – the card remains hidden
     }
 }
 
