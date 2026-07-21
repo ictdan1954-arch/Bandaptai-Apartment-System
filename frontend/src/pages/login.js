@@ -43,7 +43,7 @@ export default async function loginPage(container) {
                 </form>
                 <div class="auth-footer">
                     <p><a href="#" id="forgot-password-link">Forgot Password?</a></p>
-                    <p>&copy; ${new Date().getFullYear()} Bandaptai Apartments</p>
+                    <p>&copy; ${new Date().getFullYear()} Rikim Apartments</p>
                 </div>
             </div>
         </div>
