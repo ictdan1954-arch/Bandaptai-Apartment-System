@@ -8,6 +8,7 @@ router.use(authenticate);
 
 router.post('/', authorize('landlord', 'caretaker'), rentController.create);
 router.get('/apartment/:apartmentId', authorize('landlord', 'caretaker'), rentController.getByApartment);
+router.get('/payment-status/:apartmentId', authorize('landlord', 'caretaker'), rentController.getPaymentStatus);
 router.get('/arrears/:tenantId', authorize('landlord', 'caretaker', 'tenant'), rentController.getArrears);
 router.get('/:id', authorize('landlord', 'caretaker', 'tenant'), rentController.getById);
 router.put('/:id', authorize('landlord', 'caretaker'), rentController.update);
