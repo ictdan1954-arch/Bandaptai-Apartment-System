@@ -12,10 +12,12 @@ export default async function tenantDetails(container, params) {
     try {
         let tenant;
         if (id) {
+            // Landlord/Caretaker viewing a specific tenant
             const response = await apiService.get(`/tenants/${id}`);
             if (!response.success) throw new Error(response.message || 'Tenant not found');
             tenant = response.data;
         } else {
+            // Tenant viewing their own details
             const response = await apiService.get('/dashboard/tenant');
             if (!response.success || !response.data.tenant) throw new Error('No tenancy found');
             tenant = response.data.tenant;
@@ -23,6 +25,11 @@ export default async function tenantDetails(container, params) {
 
         const paymentsResponse = id ? await apiService.get(`/tenants/${tenant.id}/payments`) : { data: [] };
         const payments = paymentsResponse.data || [];
+
+        // For tenant's own view, the unit info is already included; for landlord view, it's nested
+        const unitNumber = id ? tenant.units?.unit_number : tenant.unit_number;
+        const apartmentName = id ? tenant.units?.apartments?.name : tenant.apartment_name;
+        const monthlyRent = id ? tenant.units?.monthly_rent : tenant.monthly_rent;
 
         container.innerHTML = `
             <div class="mb-2">
@@ -43,8 +50,8 @@ export default async function tenantDetails(container, params) {
                         <div class="stat-icon primary"><i class="fas fa-door-open"></i></div>
                         <div class="stat-info">
                             <div class="stat-label">Unit</div>
-                            <div class="stat-value" style="font-size:1rem;">${tenant.units?.unit_number || 'N/A'}</div>
-                            <div class="stat-label">${tenant.units?.apartments?.name || ''}</div>
+                            <div class="stat-value" style="font-size:1rem;">${unitNumber || 'N/A'}</div>
+                            <div class="stat-label">${apartmentName || ''}</div>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -57,7 +64,7 @@ export default async function tenantDetails(container, params) {
                     </div>
                 </div>
                 <div class="mt-2">
-                    <p><strong>Monthly Rent:</strong> ${formatCurrency(tenant.units?.monthly_rent || 0)}</p>
+                    <p><strong>Monthly Rent:</strong> ${formatCurrency(monthlyRent || 0)}</p>
                     <p><strong>Deposit Paid:</strong> ${formatCurrency(tenant.deposit_paid || 0)}</p>
                     <p><strong>Water Deposit:</strong> ${formatCurrency(tenant.water_deposit || 0)}</p>
                     <p><strong>Electricity Deposit:</strong> ${formatCurrency(tenant.electricity_deposit || 0)}</p>
@@ -67,19 +74,22 @@ export default async function tenantDetails(container, params) {
                 </div>
                 ${tenant.status === 'active' ? `
                 <div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;">
+                    ${id ? `
                     <button class="btn btn-outline" id="change-unit-btn">
                         <i class="fas fa-exchange-alt"></i> Change Unit
                     </button>
                     <button class="btn btn-outline" id="move-out-btn">
                         <i class="fas fa-sign-out-alt"></i> Move Out / Transfer
                     </button>
-                    ${id ? `
                     <button class="btn btn-outline" id="show-credentials-btn">
                         <i class="fas fa-key"></i> Show Credentials
                     </button>
                     <button class="btn btn-outline" id="msg-tenant-btn">
                         <i class="fas fa-envelope"></i> Message
-                    </button>` : ''}
+                    </button>` : `
+                    <button class="btn btn-outline" id="msg-caretaker-btn">
+                        <i class="fas fa-envelope"></i> Message Caretaker
+                    </button>`}
                 </div>` : ''}
             </div>
 
@@ -112,21 +122,51 @@ export default async function tenantDetails(container, params) {
 
         // Event listeners for the active tenant buttons
         if (tenant.status === 'active') {
-            document.getElementById('change-unit-btn').addEventListener('click', () => openChangeUnitModal(tenant));
-            document.getElementById('move-out-btn').addEventListener('click', () => openMoveOutModal(tenant));
             if (id) {
+                // Landlord/Caretaker viewing tenant
+                document.getElementById('change-unit-btn').addEventListener('click', () => openChangeUnitModal(tenant));
+                document.getElementById('move-out-btn').addEventListener('click', () => openMoveOutModal(tenant));
                 document.getElementById('show-credentials-btn').addEventListener('click', () => showCredentialsModal(tenant));
-                // Message button
                 document.getElementById('msg-tenant-btn').addEventListener('click', () => {
                     openChatModal(authService.user?.id, tenant.user_id, tenant.full_name);
                 });
+                document.getElementById('record-payment-btn')?.addEventListener('click', () => {
+                    recordPayment(tenant.id, tenant.unit_id || tenant.units?.id, tenant.units?.apartment_id);
+                });
+            } else {
+                // Tenant viewing their own details
+                document.getElementById('msg-caretaker-btn').addEventListener('click', async () => {
+                    try {
+                        const aptId = tenant.apartment_id;
+                        const res = await apiService.get(`/apartments/${aptId}/caretakers`);
+                        if (!res.success || !res.data.length) {
+                            showToast('No caretaker assigned to your apartment', 'warning');
+                            return;
+                        }
+                        const caretakers = res.data;
+                        if (caretakers.length === 1) {
+                            const c = caretakers[0];
+                            openChatModal(authService.user?.id, c.user_id, c.users?.full_name);
+                        } else {
+                            const { showFormModal } = await import('../../components/modal.js');
+                            const formHtml = `
+                                <div class="form-group">
+                                    <label class="form-label">Select Caretaker</label>
+                                    <select class="form-select" id="caretaker-select">
+                                        ${caretakers.map(c => `<option value="${c.user_id}">${c.users?.full_name}</option>`).join('')}
+                                    </select>
+                                </div>`;
+                            showFormModal('Message Caretaker', formHtml, async (overlay) => {
+                                const selectedId = overlay.querySelector('#caretaker-select').value;
+                                const selectedName = caretakers.find(c => c.user_id === selectedId)?.users?.full_name;
+                                openChatModal(authService.user?.id, selectedId, selectedName);
+                            });
+                        }
+                    } catch (e) {
+                        showToast('Could not load caretakers', 'error');
+                    }
+                });
             }
-        }
-
-        if (id) {
-            document.getElementById('record-payment-btn')?.addEventListener('click', () => {
-                recordPayment(tenant.id, tenant.unit_id, tenant.units?.apartment_id);
-            });
         }
 
         window.recordPayment = recordPayment;
@@ -177,7 +217,7 @@ function recordPayment(tenantId, unitId, apartmentId) {
     });
 }
 
-// Change Unit modal
+// Change Unit modal (only used when landlord/caretaker views)
 async function openChangeUnitModal(tenant) {
     const { showFormModal } = await import('../../components/modal.js');
 
@@ -303,12 +343,10 @@ async function openMoveOutModal(tenant) {
             }
         });
 
-        // If transfer is selected initially, load units
         if (actionSelect.value === 'transfer') {
             loadVacantUnits(tenant, transferUnitSelect);
         }
 
-        // On save (the modal's confirm button calls this callback)
         if (actionSelect.value === 'move_out') {
             const updates = {
                 status: 'moved_out',
