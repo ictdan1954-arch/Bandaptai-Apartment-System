@@ -7,7 +7,10 @@ export default async function loginPage(container) {
         <div class="auth-container">
             <div class="auth-card">
                 <div class="auth-logo">
-                    <div class="logo-icon">
+                    <img src="assets/images/logo.png" alt="Bandaptai Apartments" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                         style="max-height:80px; margin-bottom:16px;">
+                    <div class="logo-icon" style="display:none;">
                         <i class="fas fa-building"></i>
                     </div>
                     <h1>Bandaptai Apartments</h1>
@@ -39,6 +42,7 @@ export default async function loginPage(container) {
                     </button>
                 </form>
                 <div class="auth-footer">
+                    <p><a href="#" id="forgot-password-link">Forgot Password?</a></p>
                     <p>&copy; ${new Date().getFullYear()} Bandaptai Apartments</p>
                 </div>
             </div>
@@ -165,6 +169,13 @@ export default async function loginPage(container) {
                 color: var(--text-muted);
                 font-size: 0.8rem;
             }
+            .auth-footer a {
+                color: var(--primary);
+                text-decoration: none;
+            }
+            .auth-footer a:hover {
+                text-decoration: underline;
+            }
             .form-error {
                 background: var(--danger-bg);
                 color: var(--danger);
@@ -188,6 +199,12 @@ export default async function loginPage(container) {
         }
     });
 
+    // Forgot password handler
+    document.getElementById('forgot-password-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        showToast('Please contact your landlord or caretaker to reset your password.', 'info');
+    });
+
     // Form submit
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -202,7 +219,6 @@ export default async function loginPage(container) {
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner" style="width:20px;height:20px;"></span> Signing in...';
 
-            // Backend expects 'phone' field, but we send identifier (works for username/email/phone)
             const response = await authService.login(identifier, password);
             
             if (response.success) {
