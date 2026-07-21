@@ -7,7 +7,7 @@ const tenantController = {
     // Register tenant
     async create(req, res) {
         try {
-            const { full_name, phone, email, id_number, unit_id, lease_start_date, lease_end_date, deposit_paid } = req.body;
+            const { full_name, phone, email, id_number, unit_id, lease_start_date, lease_end_date, deposit_paid, water_deposit, electricity_deposit } = req.body;
             const missing = validateRequired(req.body, ['full_name', 'phone', 'unit_id']);
             if (missing.length > 0) {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
@@ -89,6 +89,8 @@ const tenantController = {
                     lease_start_date: lease_start_date || new Date().toISOString().split('T')[0],
                     lease_end_date: lease_end_date || null,
                     deposit_paid: deposit_paid || 0,
+                    water_deposit: water_deposit || 0,
+                    electricity_deposit: electricity_deposit || 0,
                     created_by: req.user.id
                 }])
                 .select('*')
@@ -209,13 +211,18 @@ const tenantController = {
             const { id } = req.params;
             const updateData = {};
 
-            // Allow unit_id to be updated
-            const allowedFields = ['full_name', 'phone', 'email', 'id_number', 'lease_end_date', 'deposit_paid', 'status', 'unit_id'];
+            // Allow unit_id, deposits, move-out fields to be updated
+            const allowedFields = ['full_name', 'phone', 'email', 'id_number', 'lease_end_date', 'deposit_paid', 'status', 'unit_id', 'water_deposit', 'electricity_deposit', 'move_out_date', 'move_out_reason'];
             allowedFields.forEach(field => {
                 if (req.body[field] !== undefined) {
                     updateData[field] = req.body[field];
                 }
             });
+
+            // If status is moved_out and no move_out_date given, set it automatically
+            if (req.body.status === 'moved_out' && !req.body.move_out_date) {
+                updateData.move_out_date = new Date().toISOString().split('T')[0];
+            }
 
             // If unit_id is being changed, handle unit statuses
             if (req.body.unit_id) {
@@ -269,7 +276,7 @@ const tenantController = {
 
             if (error) throw error;
 
-            // If tenant moved out, update unit status
+            // If tenant moved out, update unit status (if not already handled by unit change)
             if (req.body.status === 'moved_out') {
                 const { data: tenantData } = await supabase
                     .from('tenants')
