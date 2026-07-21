@@ -5,6 +5,8 @@ import { showToast } from '../components/toast.js';
 export default async function loginPage(container) {
     container.innerHTML = `
         <div class="auth-container">
+            <!-- Slideshow background layer -->
+            <div class="slideshow"></div>
             <div class="auth-card">
                 <div class="auth-logo">
                     <img src="assets/images/logo.png" alt="Rikim Apartments" 
@@ -48,31 +50,62 @@ export default async function loginPage(container) {
             </div>
         </div>
         <style>
+            /* ============ SLIDESHOW BACKGROUND ============ */
             .auth-container {
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 min-height: 100vh;
-                background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #2563EB 100%);
                 padding: 20px;
                 position: relative;
                 overflow: hidden;
+                background: #0f172a;  /* fallback if images don't load */
             }
-            .auth-container::before {
+
+            /* The slideshow layer */
+            .slideshow {
+                position: absolute;
+                top: 0; left: 0;
+                width: 100%;
+                height: 100%;
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                animation: slideShow 15s infinite;
+                z-index: 0;
+                /* Dark overlay to keep the white card readable */
+                filter: brightness(0.4);
+            }
+
+            /* Replace these URLs with your own images */
+            @keyframes slideShow {
+                0%, 30%   { background-image: url('assets/images/bg1.jpg'); }
+                33%, 63%  { background-image: url('assets/images/bg2.jpg'); }
+                66%, 96%  { background-image: url('assets/images/bg3.jpg'); }
+                100%      { background-image: url('assets/images/bg1.jpg'); }
+            }
+
+            /* Subtle rotating gradient on top of the slideshow for depth */
+            .auth-container::after {
                 content: '';
                 position: absolute;
                 width: 200%;
                 height: 200%;
                 top: -50%;
                 left: -50%;
-                background: radial-gradient(circle at 30% 70%, rgba(37,99,235,0.15) 0%, transparent 50%),
-                            radial-gradient(circle at 70% 30%, rgba(16,185,129,0.1) 0%, transparent 50%);
+                background: radial-gradient(circle at 30% 70%, rgba(37,99,235,0.1) 0%, transparent 50%),
+                            radial-gradient(circle at 70% 30%, rgba(16,185,129,0.05) 0%, transparent 50%);
                 animation: rotate 30s linear infinite;
+                z-index: 1;
+                pointer-events: none;
             }
+
             @keyframes rotate {
                 from { transform: rotate(0deg); }
                 to { transform: rotate(360deg); }
             }
+
+            /* ============ LOGIN CARD ============ */
             .auth-card {
                 background: rgba(255, 255, 255, 0.97);
                 backdrop-filter: blur(20px);
@@ -83,19 +116,20 @@ export default async function loginPage(container) {
                 box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
                 animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
                 position: relative;
-                z-index: 1;
+                z-index: 2;
             }
+
             @keyframes slideUp {
                 from { opacity: 0; transform: translateY(30px); }
                 to { opacity: 1; transform: translateY(0); }
             }
+
             .auth-logo {
                 text-align: center;
                 margin-bottom: 32px;
             }
+
             .logo-icon {
-                width: 80px;
-                height: 80px;
                 background: linear-gradient(135deg, var(--primary), var(--primary-dark));
                 border-radius: 18px;
                 display: inline-flex;
@@ -104,25 +138,30 @@ export default async function loginPage(container) {
                 margin-bottom: 16px;
                 box-shadow: 0 10px 20px rgba(37,99,235,0.3);
             }
+
             .logo-icon i {
                 font-size: 2.5rem;
                 color: white;
             }
+
             .auth-logo h1 {
-                font-size: 1.6rem;
+                font-size: clamp(1.3rem, 5vw, 1.6rem);  /* responsive */
                 font-weight: 800;
                 color: var(--text-primary);
                 margin-bottom: 4px;
                 letter-spacing: -0.5px;
             }
+
             .tagline {
                 color: var(--text-secondary);
-                font-size: 0.9rem;
+                font-size: clamp(0.8rem, 3vw, 0.9rem);  /* responsive */
                 font-weight: 500;
             }
+
             .input-icon-wrapper {
                 position: relative;
             }
+
             .input-icon {
                 position: absolute;
                 left: 14px;
@@ -132,12 +171,15 @@ export default async function loginPage(container) {
                 font-size: 1rem;
                 z-index: 2;
             }
+
             .input-icon-wrapper .form-input {
                 padding-left: 42px;
             }
+
             .password-wrapper .form-input {
                 padding-right: 46px;
             }
+
             .password-toggle-btn {
                 position: absolute;
                 right: 8px;
@@ -152,9 +194,11 @@ export default async function loginPage(container) {
                 transition: color 0.2s;
                 z-index: 2;
             }
+
             .password-toggle-btn:hover {
                 color: var(--text-primary);
             }
+
             .btn-block {
                 width: 100%;
                 padding: 14px;
@@ -163,19 +207,23 @@ export default async function loginPage(container) {
                 border-radius: 12px;
                 font-weight: 600;
             }
+
             .auth-footer {
                 text-align: center;
                 margin-top: 24px;
                 color: var(--text-muted);
                 font-size: 0.8rem;
             }
+
             .auth-footer a {
                 color: var(--primary);
                 text-decoration: none;
             }
+
             .auth-footer a:hover {
                 text-decoration: underline;
             }
+
             .form-error {
                 background: var(--danger-bg);
                 color: var(--danger);
