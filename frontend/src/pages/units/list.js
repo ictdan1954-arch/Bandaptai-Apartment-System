@@ -94,15 +94,9 @@ async function loadUnits(apartmentId) {
         const typeVal = document.getElementById('type-filter')?.value;
         const statusVal = document.getElementById('status-filter')?.value;
 
-        if (searchTerm) {
-            units = units.filter(u => u.unit_number.toLowerCase().includes(searchTerm));
-        }
-        if (typeVal) {
-            units = units.filter(u => u.unit_type === typeVal);
-        }
-        if (statusVal) {
-            units = units.filter(u => u.status === statusVal);
-        }
+        if (searchTerm) units = units.filter(u => u.unit_number.toLowerCase().includes(searchTerm));
+        if (typeVal) units = units.filter(u => u.unit_type === typeVal);
+        if (statusVal) units = units.filter(u => u.status === statusVal);
 
         const table = document.getElementById('units-table');
         const summaryDiv = document.getElementById('units-summary');
@@ -110,42 +104,15 @@ async function loadUnits(apartmentId) {
         const totalUnits = units.length;
         const occupiedUnits = units.filter(u => u.status === 'occupied').length;
         const vacantUnits = units.filter(u => u.status === 'vacant').length;
-        const expectedRent = units
-            .filter(u => u.status === 'occupied')
-            .reduce((sum, u) => sum + parseFloat(u.monthly_rent || 0), 0);
+        const expectedRent = units.filter(u => u.status === 'occupied').reduce((sum, u) => sum + parseFloat(u.monthly_rent || 0), 0);
 
         summaryDiv.innerHTML = `
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                <div class="stat-card">
-                    <div class="stat-icon primary"><i class="fas fa-door-open"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-label">Total Units</div>
-                        <div class="stat-value">${totalUnits}</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon success"><i class="fas fa-home"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-label">Occupied</div>
-                        <div class="stat-value">${occupiedUnits}</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon warning"><i class="fas fa-door-closed"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-label">Vacant</div>
-                        <div class="stat-value">${vacantUnits}</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon info"><i class="fas fa-money-bill-wave"></i></div>
-                    <div class="stat-info">
-                        <div class="stat-label">Expected Rent</div>
-                        <div class="stat-value">${formatCurrency(expectedRent)}</div>
-                    </div>
-                </div>
-            </div>
-        `;
+                <div class="stat-card"><div class="stat-icon primary"><i class="fas fa-door-open"></i></div><div class="stat-info"><div class="stat-label">Total Units</div><div class="stat-value">${totalUnits}</div></div></div>
+                <div class="stat-card"><div class="stat-icon success"><i class="fas fa-home"></i></div><div class="stat-info"><div class="stat-label">Occupied</div><div class="stat-value">${occupiedUnits}</div></div></div>
+                <div class="stat-card"><div class="stat-icon warning"><i class="fas fa-door-closed"></i></div><div class="stat-info"><div class="stat-label">Vacant</div><div class="stat-value">${vacantUnits}</div></div></div>
+                <div class="stat-card"><div class="stat-icon info"><i class="fas fa-money-bill-wave"></i></div><div class="stat-info"><div class="stat-label">Expected Rent</div><div class="stat-value">${formatCurrency(expectedRent)}</div></div></div>
+            </div>`;
         summaryDiv.style.display = 'block';
 
         if (units.length === 0) {
@@ -153,6 +120,7 @@ async function loadUnits(apartmentId) {
             return;
         }
 
+        // NOTE: The "Assign Tenant" button has been intentionally removed.
         table.innerHTML = `
             <table class="table">
                 <thead>
@@ -170,20 +138,11 @@ async function loadUnits(apartmentId) {
                                 <div class="table-actions">
                                     <button onclick="window.editUnit('${u.id}')" title="Edit"><i class="fas fa-edit"></i></button>
                                     <button class="danger" onclick="window.deleteUnit('${u.id}')" title="Delete"><i class="fas fa-trash"></i></button>
-                                    ${u.status === 'vacant' ? `<button class="btn btn-sm btn-outline assign-tenant-btn" data-unit-id="${u.id}" title="Assign Tenant"><i class="fas fa-user-plus"></i></button>` : ''}
                                 </div>
                             </td>
                         </tr>`).join('')}
                 </tbody>
             </table>`;
-
-        table.addEventListener('click', (e) => {
-            const assignBtn = e.target.closest('.assign-tenant-btn');
-            if (assignBtn) {
-                const unitId = assignBtn.dataset.unitId;
-                openAssignTenantModal(unitId, apartmentId);
-            }
-        });
 
         window.editUnit = (id) => editUnit(id, apartmentId);
         window.deleteUnit = (id) => deleteUnit(id, apartmentId);
@@ -192,42 +151,6 @@ async function loadUnits(apartmentId) {
         document.getElementById('units-table').innerHTML = `<div class="error-state"><p>${error.message}</p></div>`;
         document.getElementById('units-summary').style.display = 'none';
     }
-}
-
-async function openAssignTenantModal(unitId, apartmentId) {
-    const { showFormModal } = await import('../../components/modal.js');
-    let query = '?status=active';
-    if (authService.getRole() === 'caretaker') {
-        query += `&apartment_id=${apartmentId}`;
-    }
-    const tenantsRes = await apiService.get(`/tenants${query}`);
-    const tenants = tenantsRes.success ? tenantsRes.data : [];
-
-    if (tenants.length === 0) {
-        showToast('No active tenants available', 'warning');
-        return;
-    }
-
-    const formHtml = `
-        <p>Assign a tenant to this unit.</p>
-        <div class="form-group">
-            <label class="form-label">Select Tenant</label>
-            <select class="form-select" id="assign-tenant">
-                ${tenants.map(t => `<option value="${t.id}">${t.full_name} (${t.phone})</option>`).join('')}
-            </select>
-        </div>`;
-
-    showFormModal('Assign Tenant', formHtml, async (overlay) => {
-        const tenantId = overlay.querySelector('#assign-tenant').value;
-        try {
-            await apiService.put(`/tenants/${tenantId}`, { unit_id: unitId });
-            showToast('Tenant assigned successfully', 'success');
-            loadUnits(apartmentId);
-        } catch (e) {
-            showToast(e.message, 'error');
-            return false;
-        }
-    });
 }
 
 function openAddModal(apartmentId) {
@@ -249,6 +172,18 @@ function openAddModal(apartmentId) {
         <div class="form-group">
             <label class="form-label">Deposit Amount (KES)</label>
             <input type="number" class="form-input" id="unit-deposit" min="0" step="100" value="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Water Deposit (KES)</label>
+            <input type="number" class="form-input" id="unit-water-deposit" min="0" step="100" value="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Electricity Deposit (KES)</label>
+            <input type="number" class="form-input" id="unit-electricity-deposit" min="0" step="100" value="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">General Deposit (KES)</label>
+            <input type="number" class="form-input" id="unit-general-deposit" min="0" step="100" value="0">
         </div>`;
 
     showFormModal('Add Unit', formHtml, async (overlay) => {
@@ -257,7 +192,10 @@ function openAddModal(apartmentId) {
             unit_number: overlay.querySelector('#unit-number').value,
             unit_type: overlay.querySelector('#unit-type').value,
             monthly_rent: parseFloat(overlay.querySelector('#unit-rent').value),
-            deposit_amount: parseFloat(overlay.querySelector('#unit-deposit').value) || 0
+            deposit_amount: parseFloat(overlay.querySelector('#unit-deposit').value) || 0,
+            water_deposit: parseFloat(overlay.querySelector('#unit-water-deposit').value) || 0,
+            electricity_deposit: parseFloat(overlay.querySelector('#unit-electricity-deposit').value) || 0,
+            general_deposit: parseFloat(overlay.querySelector('#unit-general-deposit').value) || 0
         };
         if (!data.unit_number || !data.monthly_rent) {
             showToast('Unit number and rent are required', 'error');
@@ -298,13 +236,33 @@ async function editUnit(unitId, apartmentId) {
             <select class="form-select" id="edit-unit-status">
                 ${CONFIG.UNIT_STATUSES.map(s => `<option value="${s}" ${u.status === s ? 'selected' : ''}>${capitalize(s)}</option>`).join('')}
             </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Deposit Amount (KES)</label>
+            <input type="number" class="form-input" id="edit-unit-deposit" value="${u.deposit_amount || 0}" step="100" min="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Water Deposit (KES)</label>
+            <input type="number" class="form-input" id="edit-unit-water-deposit" value="${u.water_deposit || 0}" step="100" min="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Electricity Deposit (KES)</label>
+            <input type="number" class="form-input" id="edit-unit-electricity-deposit" value="${u.electricity_deposit || 0}" step="100" min="0">
+        </div>
+        <div class="form-group">
+            <label class="form-label">General Deposit (KES)</label>
+            <input type="number" class="form-input" id="edit-unit-general-deposit" value="${u.general_deposit || 0}" step="100" min="0">
         </div>`;
     showFormModal('Edit Unit', formHtml, async (overlay) => {
         const updates = {
             unit_number: overlay.querySelector('#edit-unit-number').value,
             unit_type: overlay.querySelector('#edit-unit-type').value,
             monthly_rent: parseFloat(overlay.querySelector('#edit-unit-rent').value),
-            status: overlay.querySelector('#edit-unit-status').value
+            status: overlay.querySelector('#edit-unit-status').value,
+            deposit_amount: parseFloat(overlay.querySelector('#edit-unit-deposit').value) || 0,
+            water_deposit: parseFloat(overlay.querySelector('#edit-unit-water-deposit').value) || 0,
+            electricity_deposit: parseFloat(overlay.querySelector('#edit-unit-electricity-deposit').value) || 0,
+            general_deposit: parseFloat(overlay.querySelector('#edit-unit-general-deposit').value) || 0
         };
         await apiService.put(`/units/${unitId}`, updates);
         showToast('Unit updated!', 'success');
