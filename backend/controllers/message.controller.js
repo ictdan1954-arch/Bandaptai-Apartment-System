@@ -23,12 +23,13 @@ const messageController = {
 
             if (error) throw error;
 
-            // Send notification to receiver
+            // Send notification with link to the sender
             await supabase.from('notifications').insert([{
                 user_id: receiver_id,
                 title: 'New Message',
                 message: `${req.user.role} sent you a message: "${message.trim().substring(0, 50)}..."`,
-                type: 'general'
+                type: 'general',
+                link: `/messages?partner=${req.user.id}`   // <-- link added
             }]);
 
             return ApiResponse.created(res, data, 'Message sent');
@@ -104,21 +105,16 @@ const messageController = {
             const { partnerId } = req.params;
             const userId = req.user.id;
 
+            // Fetch all messages where the two users are involved, ignoring deleted flags for now
             const { data, error } = await supabase
                 .from('messages')
                 .select('*, sender:sender_id(id, full_name, role), receiver:receiver_id(id, full_name, role)')
                 .or(`and(sender_id.eq.${userId},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${userId})`)
-                .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-                .filter('deleted_by_sender', 'eq', false)
-                .filter('deleted_by_receiver', 'eq', false)
-                // Actually we need to filter: for messages where I'm sender, deleted_by_sender must be false;
-                // for messages where I'm receiver, deleted_by_receiver must be false.
-                // We can do this in JS after fetch for simplicity.
                 .order('created_at', { ascending: true });
 
             if (error) throw error;
 
-            // Filter client-side
+            // Client-side filter to hide messages deleted by the current user
             const filtered = data.filter(m => {
                 if (m.sender_id === userId && m.deleted_by_sender) return false;
                 if (m.receiver_id === userId && m.deleted_by_receiver) return false;
