@@ -1,5 +1,5 @@
 /* =============================================
-   CARDS - ESTATE CALM
+   CARDS - RIKIM APARTMENTS MODERN HERITAGE
    Warm, elevated containers for all your data.
    ============================================= */
 
@@ -78,7 +78,7 @@
     transform: scale(1.06);
 }
 
-/* Icon Variants (mapped to Estate Calm palette) */
+/* Icon Variants (mapped to Modern Heritage palette) */
 .stat-icon.primary {
     background: var(--primary-bg);
     color: var(--primary);
@@ -105,7 +105,7 @@
 
 .stat-icon.warning {
     background: var(--warning-bg);
-    color: #A87D52; /* Darker gold for contrast */
+    color: #B07A6A; /* Darker warm peach for contrast */
 }
 .stat-card:has(.stat-icon.warning) {
     border-left-color: var(--warning);
@@ -113,7 +113,7 @@
 
 .stat-icon.info {
     background: var(--info-bg);
-    color: #9A84B0; /* Darker lavender */
+    color: #8A7AA0; /* Darker lavender */
 }
 .stat-card:has(.stat-icon.info) {
     border-left-color: var(--info);
