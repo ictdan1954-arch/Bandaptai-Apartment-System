@@ -536,3 +536,114 @@ input, select, textarea {
         padding: 24px 16px;
     }
 }
+ /* =============================================
+   LOGIN PAGE STYLES (Compatible with app.js)
+   ============================================= */
+
+/* Login Page Body */
+body.login-page {
+    background-image: url('../assets/images/login-splash.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-color: #2A2A2A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+}
+
+/* Hide dashboard when on login page */
+body.login-page #app {
+    display: none;
+}
+
+/* Login Container (Glass effect) */
+body.login-page .login-container {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius-lg);
+    padding: 48px 40px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    max-width: 440px;
+    width: 100%;
+    animation: slideUp 0.5s cubic-bezier(0.21, 0.98, 0.35, 1.0);
+}
+
+body.login-page .login-logo {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+body.login-page .login-logo img {
+    height: 64px;
+    width: auto;
+    margin-bottom: 12px;
+}
+
+body.login-page .login-logo h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+body.login-page .login-logo p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+
+body.login-page .login-container .form-group {
+    margin-bottom: 20px;
+}
+
+body.login-page .login-container .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 1rem;
+}
+
+body.login-page .login-footer {
+    text-align: center;
+    margin-top: 20px;
+}
+
+body.login-page .login-footer a {
+    color: var(--primary);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+body.login-page .login-footer a:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+/* Responsive login */
+@media (max-width: 768px) {
+    body.login-page .login-container {
+        padding: 32px 24px;
+        margin: 16px;
+    }
+    body.login-page .login-logo img {
+        height: 48px;
+    }
+    body.login-page .login-logo h1 {
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    body.login-page .login-container {
+        padding: 24px 16px;
+    }
+    body.login-page .login-logo img {
+        height: 40px;
+    }
+}
