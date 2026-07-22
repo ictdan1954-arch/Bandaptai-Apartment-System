@@ -18,11 +18,36 @@ export async function setupSidebar() {
     const sidebar = document.getElementById('sidebar');
     if (sidebar) sidebar.style.display = 'flex';
 
-    const nav = document.getElementById('sidebar-nav');
-    const role = authService.getRole();
-    const staffRole = authService.getStaffRole(); // e.g., 'cleaner'
+    // ---------- ENSURE staff_role IS AVAILABLE ----------
+    let role = authService.getRole();
+    let staffRole = authService.getStaffRole();
 
-    const menuItems = getMenuItems(role, staffRole);
+    // If staff_role missing, fetch it from the backend
+    if (role === 'staff' && !staffRole) {
+        try {
+            const phone = authService.user.phone;
+            const response = await apiService.get(`/staff/members/by-phone/${phone}`);
+            if (response.success && response.data?.staff_role) {
+                staffRole = response.data.staff_role.toLowerCase();
+                authService.user.staff_role = staffRole;
+                localStorage.setItem('rikim_user', JSON.stringify(authService.user));
+            }
+        } catch (e) {
+            console.warn('Could not fetch staff_role, using generic staff menu');
+        }
+    } else if (staffRole) {
+        // Normalise to lower case for consistent comparisons
+        staffRole = staffRole.toLowerCase();
+    }
+
+    // ✅ Override the main role for cleaners so the sidebar treats them as a top‑level role
+    if (role === 'staff' && staffRole === 'cleaner') {
+        role = 'cleaner';
+    }
+
+    // Build navigation using the (possibly overridden) role
+    const nav = document.getElementById('sidebar-nav');
+    const menuItems = getMenuItems(role);
     renderNav(nav, menuItems);
 
     // ----- Caretaker: replace generic "My Apartments" with actual assigned apartments -----
@@ -105,13 +130,13 @@ export function updateSidebarUserInfo() {
     if (nameEl) nameEl.textContent = user.full_name;
 
     if (roleEl) {
-        let displayRole = user.role;
-        if (user.staff_role === 'cleaner') {
-            displayRole = 'Cleaner';
+        // Use the normalised staff_role (case‑insensitive)
+        const staffRole = (user.staff_role || '').toLowerCase();
+        if (staffRole === 'cleaner') {
+            roleEl.textContent = 'Cleaner';
         } else {
-            displayRole = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+            roleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
         }
-        roleEl.textContent = displayRole;
     }
 
     if (avatarEl && user.profile_photo) {
@@ -120,11 +145,11 @@ export function updateSidebarUserInfo() {
 }
 
 // =============================================
-// PRIVATE: MENU DEFINITIONS
+// PRIVATE: MENU DEFINITIONS (now based on a unified role)
 // =============================================
-function getMenuItems(role, staffRole) {
-    // If the user is a staff member with a specific sub-role, use that menu
-    if (role === 'staff' && staffRole === 'cleaner') {
+function getMenuItems(role) {
+    // Cleaner is treated as a distinct role
+    if (role === 'cleaner') {
         return [
             { section: 'MAIN', items: [
                 { icon: 'fa-th-large', text: 'Dashboard', href: '/cleaning/dashboard' }
@@ -196,10 +221,11 @@ function getMenuItems(role, staffRole) {
         ]}
     ];
 
+    // The fallback order: cleaner is already handled above, so it won't reach here
     if (role === 'landlord') return landlordMenu;
     if (role === 'caretaker') return caretakerMenu;
     if (role === 'tenant') return tenantMenu;
-    if (role === 'staff') return staffMenu;
+    if (role === 'staff') return staffMenu;      // other staff (electrician, etc.)
     return [];
 }
 
@@ -234,7 +260,7 @@ function updateActiveLink() {
         if (currentHash.startsWith(href) || (href === '/dashboard' && currentHash === '/dashboard')) {
             link.classList.add('active');
         }
-        // Also highlight '/cleaning/dashboard' for all cleaner sub-links (they all point to same page)
+        // Also highlight '/cleaning/dashboard' for cleaner sub‑links
         if (href === '/cleaning/dashboard' && currentHash.startsWith('/cleaning/dashboard')) {
             link.classList.add('active');
         }
