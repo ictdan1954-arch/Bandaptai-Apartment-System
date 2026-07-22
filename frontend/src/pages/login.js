@@ -4,11 +4,13 @@ import { showToast } from '../components/toast.js';
 
 export default async function loginPage(container) {
     // Ensure container is visible
-    container.style.display = 'block';
-    container.style.minHeight = '100vh';
     container.style.display = 'flex';
     container.style.alignItems = 'center';
     container.style.justifyContent = 'center';
+    container.style.minHeight = '100vh';
+    container.style.padding = '0';
+    container.style.margin = '0';
+    container.style.width = '100%';
 
     container.innerHTML = `
         <div class="auth-container">
@@ -55,7 +57,7 @@ export default async function loginPage(container) {
             </div>
         </div>
         <style>
-            /* Ensure the page content container fills the viewport */
+            /* Reset container styles */
             #page-content {
                 display: flex !important;
                 align-items: center !important;
@@ -64,6 +66,7 @@ export default async function loginPage(container) {
                 padding: 0 !important;
                 margin: 0 !important;
                 background: transparent !important;
+                width: 100% !important;
             }
 
             .auth-container {
@@ -75,12 +78,14 @@ export default async function loginPage(container) {
                 position: relative;
                 overflow: hidden;
                 width: 100%;
-                background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 58, 95, 0.6) 50%, rgba(37, 99, 235, 0.5) 100%),
+                /* 
+                    ⭐ USING login-splash01.jpg AS REQUESTED ⭐
+                */
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 58, 95, 0.5) 50%, rgba(37, 99, 235, 0.4) 100%),
                             url('assets/images/login-splash01.jpg');
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
-                /* Fallback solid color if image fails */
                 background-color: #1a2a4a;
             }
 
@@ -91,8 +96,8 @@ export default async function loginPage(container) {
                 height: 200%;
                 top: -50%;
                 left: -50%;
-                background: radial-gradient(circle at 30% 70%, rgba(37,99,235,0.1) 0%, transparent 50%),
-                            radial-gradient(circle at 70% 30%, rgba(16,185,129,0.05) 0%, transparent 50%);
+                background: radial-gradient(circle at 30% 70%, rgba(37,99,235,0.08) 0%, transparent 50%),
+                            radial-gradient(circle at 70% 30%, rgba(16,185,129,0.04) 0%, transparent 50%);
                 animation: rotate 30s linear infinite;
                 z-index: 1;
                 pointer-events: none;
@@ -106,6 +111,7 @@ export default async function loginPage(container) {
             .auth-card {
                 background: rgba(255, 255, 255, 0.97);
                 backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
                 border-radius: 24px;
                 padding: 40px;
                 width: 100%;
@@ -230,7 +236,6 @@ export default async function loginPage(container) {
                 margin-bottom: 12px;
             }
 
-            /* Responsive adjustments */
             @media (max-width: 480px) {
                 .auth-card {
                     padding: 24px;
