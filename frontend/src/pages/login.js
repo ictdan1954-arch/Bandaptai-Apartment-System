@@ -1,7 +1,7 @@
 import { authService } from '../services/auth.service.js';
 import { router } from '../router.js';
 import { showToast } from '../components/toast.js';
-import { setupSidebar, updateSidebarUserInfo } from '../components/sidebar.js';
+import { setupSidebar } from '../components/sidebar.js';
 
 export default async function loginPage() {
     console.log('✅ loginPage loaded!');
@@ -128,16 +128,15 @@ export default async function loginPage() {
                 if (response.success) {
                     showToast('Welcome back!', 'success');
 
-                    // Remove overlay and show app
+                    // Remove overlay and show the app immediately
                     overlay.remove();
                     if (app) app.style.display = '';
 
-                    // ✅ Re-initialize sidebar now that user is authenticated
-                    await setupSidebar();
-                    updateSidebarUserInfo();
-
-                    // Navigate to the appropriate dashboard
+                    // Navigate right away — sidebar will load in the background
                     router.navigateByRole();
+
+                    // Kick off sidebar setup without blocking navigation
+                    setupSidebar().catch(err => console.error('Sidebar setup error:', err));
                 } else {
                     throw new Error(response.message || 'Login failed');
                 }
