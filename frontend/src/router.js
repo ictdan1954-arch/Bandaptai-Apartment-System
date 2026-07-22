@@ -15,6 +15,46 @@ class Router {
         this.routes[path] = config;
     }
 
+    // =============================================
+    // SET BODY CLASS BASED ON CURRENT ROUTE
+    // =============================================
+    setBodyClass(path) {
+        // Remove both classes first
+        document.body.classList.remove('login-page', 'dashboard-page');
+        
+        // Add the appropriate class
+        if (path === '/login') {
+            document.body.classList.add('login-page');
+        } else {
+            document.body.classList.add('dashboard-page');
+        }
+    }
+
+    // =============================================
+    // NAVIGATE TO THE CORRECT DASHBOARD BASED ON ROLE
+    // =============================================
+    navigateByRole() {
+        const role = authService.getRole();
+        const user = authService.user;
+
+        // Check if user is a cleaner (staff_role = 'cleaner')
+        if (user?.staff_role === 'cleaner' || role === 'cleaner') {
+            this.navigate('/cleaning/dashboard');
+            return;
+        }
+
+        // Map roles to their dashboard routes
+        const roleRoutes = {
+            'landlord': '/dashboard',
+            'caretaker': '/dashboard',
+            'tenant': '/dashboard',
+            'staff': '/dashboard'
+        };
+
+        const route = roleRoutes[role] || '/dashboard';
+        this.navigate(route);
+    }
+
     async handleRoute() {
         const hash = window.location.hash.slice(1) || '/login';
         const [path, queryString] = hash.split('?');
@@ -59,21 +99,32 @@ class Router {
             return;
         }
 
-        // Check role
+        // Check role (support both main role and staff_role)
         if (route.role) {
             const userRole = authService.getRole();
-            if (!route.role.includes(userRole)) {
+            const userStaffRole = authService.user?.staff_role;
+            
+            // Allow if main role matches OR staff_role matches
+            const hasRole = route.role.includes(userRole) || 
+                           (userStaffRole && route.role.includes(userStaffRole));
+            
+            if (!hasRole) {
                 this.navigate('/login');
                 return;
             }
         }
+
+        // =============================================
+        // SET BODY CLASS BASED ON ROUTE
+        // =============================================
+        this.setBodyClass(path);
 
         this.currentRoute = { path, params };
         
         // Update page title
         if (route.title) {
             this.pageTitle.textContent = route.title;
-            document.title = `${route.title} - Rikims Apartments`;
+            document.title = `${route.title} - Rikim Apartments`;
         }
 
         // Show loading
