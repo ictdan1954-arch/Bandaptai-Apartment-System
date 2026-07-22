@@ -3,6 +3,13 @@ import { router } from '../router.js';
 import { showToast } from '../components/toast.js';
 
 export default async function loginPage(container) {
+    // Ensure container is visible
+    container.style.display = 'block';
+    container.style.minHeight = '100vh';
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
+
     container.innerHTML = `
         <div class="auth-container">
             <div class="auth-card">
@@ -48,6 +55,17 @@ export default async function loginPage(container) {
             </div>
         </div>
         <style>
+            /* Ensure the page content container fills the viewport */
+            #page-content {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 100vh !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+            }
+
             .auth-container {
                 display: flex;
                 align-items: center;
@@ -56,15 +74,16 @@ export default async function loginPage(container) {
                 padding: 20px;
                 position: relative;
                 overflow: hidden;
-                /* Single background photo with dark overlay */
+                width: 100%;
                 background: linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 58, 95, 0.6) 50%, rgba(37, 99, 235, 0.5) 100%),
                             url('assets/images/login-splash01.jpg');
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
+                /* Fallback solid color if image fails */
+                background-color: #1a2a4a;
             }
 
-            /* Subtle rotating gradient for depth */
             .auth-container::after {
                 content: '';
                 position: absolute;
@@ -95,6 +114,7 @@ export default async function loginPage(container) {
                 animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
                 position: relative;
                 z-index: 2;
+                margin: 20px;
             }
 
             @keyframes slideUp {
@@ -209,58 +229,80 @@ export default async function loginPage(container) {
                 border-radius: 8px;
                 margin-bottom: 12px;
             }
+
+            /* Responsive adjustments */
+            @media (max-width: 480px) {
+                .auth-card {
+                    padding: 24px;
+                    margin: 12px;
+                }
+                .auth-logo h1 {
+                    font-size: 1.2rem;
+                }
+            }
         </style>
     `;
 
     // Toggle password visibility
-    document.getElementById('toggle-password').addEventListener('click', function() {
-        const pwd = document.getElementById('login-password');
-        const icon = this.querySelector('i');
-        if (pwd.type === 'password') {
-            pwd.type = 'text';
-            icon.className = 'fas fa-eye-slash';
-        } else {
-            pwd.type = 'password';
-            icon.className = 'fas fa-eye';
-        }
-    });
+    const toggleBtn = document.getElementById('toggle-password');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            const pwd = document.getElementById('login-password');
+            const icon = this.querySelector('i');
+            if (pwd.type === 'password') {
+                pwd.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                pwd.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        });
+    }
 
     // Forgot password handler
-    document.getElementById('forgot-password-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        showToast('Please contact your landlord or caretaker to reset your password.', 'info');
-    });
+    const forgotLink = document.getElementById('forgot-password-link');
+    if (forgotLink) {
+        forgotLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showToast('Please contact your landlord or caretaker to reset your password.', 'info');
+        });
+    }
 
     // Form submit
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const identifier = document.getElementById('login-identifier').value.trim();
-        const password = document.getElementById('login-password').value;
-        const errorEl = document.getElementById('login-error');
-        
-        errorEl.style.display = 'none';
-
-        try {
-            const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner" style="width:20px;height:20px;"></span> Signing in...';
-
-            const response = await authService.login(identifier, password);
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const identifier = document.getElementById('login-identifier').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
             
-            if (response.success) {
-                showToast('Welcome back!', 'success');
-                // ⭐ UPDATED: Use role-based navigation ⭐
-                router.navigateByRole();
-                // No reload needed – the router will handle the page load
+            if (errorEl) errorEl.style.display = 'none';
+
+            try {
+                const btn = e.target.querySelector('button');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width:20px;height:20px;"></span> Signing in...';
+
+                const response = await authService.login(identifier, password);
+                
+                if (response.success) {
+                    showToast('Welcome back!', 'success');
+                    router.navigateByRole();
+                } else {
+                    throw new Error(response.message || 'Login failed');
+                }
+            } catch (error) {
+                if (errorEl) {
+                    errorEl.textContent = error.message;
+                    errorEl.style.display = 'block';
+                }
+                showToast(error.message, 'error');
+            } finally {
+                const btn = e.target.querySelector('button');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
             }
-        } catch (error) {
-            errorEl.textContent = error.message;
-            errorEl.style.display = 'block';
-            showToast(error.message, 'error');
-        } finally {
-            const btn = e.target.querySelector('button');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-        }
-    });
+        });
+    }
 }
