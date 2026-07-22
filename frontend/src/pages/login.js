@@ -1,4 +1,5 @@
 import { authService } from '../services/auth.service.js';
+import { apiService } from '../services/api.service.js';   // ADDED
 import { router } from '../router.js';
 import { showToast } from '../components/toast.js';
 import { setupSidebar } from '../components/sidebar.js';
@@ -128,12 +129,27 @@ export default async function loginPage() {
                 if (response.success) {
                     showToast('Welcome back!', 'success');
 
-                    // Show app and navigate instantly
+                    // Remove overlay and show app immediately
                     overlay.remove();
                     if (app) app.style.display = '';
+
+                    // Navigate to correct dashboard right away
                     router.navigateByRole();
 
-                    // Sidebar loads in background – won't slow down login
+                    // If the logged-in user is a staff member, we need to fetch
+                    // the full profile to get staff_role (e.g. 'cleaner').
+                    if (authService.getRole() === 'staff') {
+                        try {
+                            const profile = await apiService.get('/auth/profile');  // or /auth/me
+                            if (profile.success && profile.data) {
+                                authService.saveUser(profile.data);  // updates user with staff_role
+                            }
+                        } catch (e) {
+                            console.error('Failed to fetch staff profile, sidebar may remain generic:', e);
+                        }
+                    }
+
+                    // Set up sidebar (now with correct staff_role, if available)
                     setupSidebar().catch(err => console.error('Sidebar setup error:', err));
                 } else {
                     throw new Error(response.message || 'Login failed');
