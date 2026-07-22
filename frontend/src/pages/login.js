@@ -249,8 +249,9 @@ export default async function loginPage(container) {
             
             if (response.success) {
                 showToast('Welcome back!', 'success');
-                router.navigate('/dashboard');
-                window.location.reload();
+                // ⭐ UPDATED: Use role-based navigation ⭐
+                router.navigateByRole();
+                // No reload needed – the router will handle the page load
             }
         } catch (error) {
             errorEl.textContent = error.message;
