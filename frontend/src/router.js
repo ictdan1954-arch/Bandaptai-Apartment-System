@@ -6,11 +6,12 @@ class Router {
         this.currentRoute = null;
         this.pageContent = document.getElementById('page-content');
         this.pageTitle = document.getElementById('page-title');
-        
+
         window.addEventListener('hashchange', () => this.handleRoute());
         window.addEventListener('load', () => this.handleRoute());
     }
 
+    // Add a route configuration
     addRoute(path, config) {
         this.routes[path] = config;
     }
@@ -19,10 +20,7 @@ class Router {
     // SET BODY CLASS BASED ON CURRENT ROUTE
     // =============================================
     setBodyClass(path) {
-        // Remove both classes first
         document.body.classList.remove('login-page', 'dashboard-page');
-        
-        // Add the appropriate class
         if (path === '/login') {
             document.body.classList.add('login-page');
         } else {
@@ -35,31 +33,42 @@ class Router {
     // =============================================
     navigateByRole() {
         const role = authService.getRole();
-        const user = authService.user;
+        const staffRole = (authService.getStaffRole() || '').toLowerCase();
 
-        // Check if user is a cleaner (staff_role = 'cleaner')
-        if (user?.staff_role === 'cleaner' || role === 'cleaner') {
-            this.navigate('/cleaning/dashboard');
+        // Staff sub‑role mapping (add more as needed)
+        if (role === 'staff' && staffRole) {
+            const subRoleMap = {
+                cleaner: '/cleaning/dashboard',
+                electrician: '/electrician/dashboard',
+                plumber: '/plumber/dashboard',
+                gardener: '/gardener/dashboard',
+                // fallback for unknown sub‑roles
+            };
+            const target = subRoleMap[staffRole] || '/dashboard';
+            this.navigate(target);
             return;
         }
 
-        // Map roles to their dashboard routes
+        // Main role mapping
         const roleRoutes = {
-            'landlord': '/dashboard',
-            'caretaker': '/dashboard',
-            'tenant': '/dashboard',
-            'staff': '/dashboard'
+            landlord: '/dashboard',
+            caretaker: '/dashboard',
+            tenant: '/dashboard',
+            staff: '/dashboard',   // generic staff (no sub‑role)
         };
 
         const route = roleRoutes[role] || '/dashboard';
         this.navigate(route);
     }
 
+    // =============================================
+    // MAIN ROUTE HANDLER
+    // =============================================
     async handleRoute() {
         const hash = window.location.hash.slice(1) || '/login';
         const [path, queryString] = hash.split('?');
-        
-        // Parse query params
+
+        // Parse query parameters
         const params = {};
         if (queryString) {
             queryString.split('&').forEach(pair => {
@@ -68,17 +77,15 @@ class Router {
             });
         }
 
-        // Find matching route
+        // Find route definition (supports parameterized routes)
         let route = this.routes[path];
         if (!route) {
-            // Check for parameterized routes
             for (const [routePath, routeConfig] of Object.entries(this.routes)) {
                 const pattern = routePath.replace(/:\w+/g, '([^/]+)');
                 const regex = new RegExp(`^${pattern}$`);
                 const match = path.match(regex);
                 if (match) {
                     route = routeConfig;
-                    // Extract params from URL
                     const paramNames = (routePath.match(/:\w+/g) || []).map(p => p.slice(1));
                     paramNames.forEach((name, index) => {
                         params[name] = match[index + 1];
@@ -88,50 +95,47 @@ class Router {
             }
         }
 
+        // No route found – redirect to login
         if (!route) {
             this.navigate('/login');
             return;
         }
 
-        // Check authentication
+        // Authentication check
         if (route.auth && !authService.isAuthenticated()) {
             this.navigate('/login');
             return;
         }
 
-        // Check role (support both main role and staff_role)
+        // Role authorization (checks both main role and staff_role)
         if (route.role) {
             const userRole = authService.getRole();
-            const userStaffRole = authService.user?.staff_role;
-            
-            // Allow if main role matches OR staff_role matches
-            const hasRole = route.role.includes(userRole) || 
+            const userStaffRole = (authService.getStaffRole() || '').toLowerCase();
+
+            const hasRole = route.role.includes(userRole) ||
                            (userStaffRole && route.role.includes(userStaffRole));
-            
+
             if (!hasRole) {
                 this.navigate('/login');
                 return;
             }
         }
 
-        // =============================================
-        // SET BODY CLASS BASED ON ROUTE
-        // =============================================
+        // Update body class
         this.setBodyClass(path);
 
         this.currentRoute = { path, params };
-        
-        // Update page title
+
+        // Page title
         if (route.title) {
             this.pageTitle.textContent = route.title;
             document.title = `${route.title} - Rikim Apartments`;
         }
 
-        // Show loading
+        // Loading indicator
         this.pageContent.innerHTML = '<div class="page-loader"><div class="spinner"></div></div>';
 
         try {
-            // Load page
             const module = await route.component();
             if (module.default) {
                 await module.default(this.pageContent, params);
@@ -149,6 +153,9 @@ class Router {
         }
     }
 
+    // =============================================
+    // NAVIGATE TO A PATH
+    // =============================================
     navigate(path) {
         window.location.hash = path;
     }
