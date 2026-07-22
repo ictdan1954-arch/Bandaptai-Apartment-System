@@ -12,7 +12,16 @@ const authenticate = (req, res, next) => {
         const token = authHeader.split(' ')[1];
         const decoded = verifyToken(token);
 
-        req.user = decoded;
+        // Attach user details from the token to the request
+        req.user = {
+            id: decoded.id,
+            role: decoded.role,
+            staff_role: decoded.staff_role || null,   // ✅ sub‑role for staff (cleaner, etc.)
+            full_name: decoded.full_name || null,
+            phone: decoded.phone || null,
+            email: decoded.email || null
+        };
+
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
