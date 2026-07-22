@@ -1,4 +1,5 @@
 import { authService } from '../services/auth.service.js';
+import { apiService } from '../services/api.service.js';   // ADDED for fallback call
 import { router } from '../router.js';
 import { showToast } from '../components/toast.js';
 import { setupSidebar } from '../components/sidebar.js';
@@ -120,6 +121,22 @@ export default async function loginPage() {
                 overlay.remove();
                 if (app) app.style.display = '';
                 router.navigateByRole();
+
+                // ---- ENSURE staff_role IS AVAILABLE FOR STAFF USERS ----
+                if (authService.getRole() === 'staff' && !authService.getStaffRole()) {
+                    try {
+                        const phone = authService.user.phone;
+                        const staffRes = await apiService.get(`/staff/members/by-phone/${phone}`);
+                        if (staffRes.success && staffRes.data && staffRes.data.staff_role) {
+                            const updatedUser = { ...authService.user, staff_role: staffRes.data.staff_role };
+                            authService.saveUser(updatedUser);
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch staff_role, sidebar may remain generic', e);
+                    }
+                }
+
+                // Sidebar loads in background (now with correct staff_role if available)
                 setupSidebar().catch(err => console.error('Sidebar setup error:', err));
             } else {
                 throw new Error(response.message || 'Login failed');
