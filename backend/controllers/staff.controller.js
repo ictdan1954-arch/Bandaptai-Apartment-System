@@ -54,20 +54,15 @@ const staffController = {
         }
     },
 
-    // =============================================
-    // UPDATE ROLE (NEW - Fixes 404 error)
-    // =============================================
     async updateRole(req, res) {
         try {
             const { id } = req.params;
             const { role_name, description } = req.body;
 
-            // Validate required fields
             if (!role_name) {
                 return ApiResponse.badRequest(res, 'Role name is required');
             }
 
-            // Check if role exists
             const { data: existingRole, error: checkError } = await supabase
                 .from('staff_roles')
                 .select('*')
@@ -78,7 +73,6 @@ const staffController = {
                 return ApiResponse.notFound(res, 'Staff role not found');
             }
 
-            // Check if new role name conflicts with another role
             const { data: duplicate, error: dupError } = await supabase
                 .from('staff_roles')
                 .select('id')
@@ -90,7 +84,6 @@ const staffController = {
                 return ApiResponse.badRequest(res, 'A role with this name already exists');
             }
 
-            // Update the role
             const { data: role, error } = await supabase
                 .from('staff_roles')
                 .update({
@@ -163,7 +156,6 @@ const staffController = {
         }
     },
 
-    // Get members – supports 'all' for landlord and search
     async getMembers(req, res) {
         try {
             const { apartmentId } = req.params;
@@ -193,7 +185,6 @@ const staffController = {
         }
     },
 
-    // Get members with account status – NOW ACCEPTS filters
     async getMembersWithAccounts(req, res) {
         try {
             const { apartmentId } = req.params;
@@ -257,6 +248,29 @@ const staffController = {
             return ApiResponse.success(res, member);
         } catch (error) {
             return ApiResponse.error(res, 'Failed to fetch staff member');
+        }
+    },
+
+    // NEW: Get staff member by phone (used by cleaner login to get staff_role)
+    async getMemberByPhone(req, res) {
+        try {
+            const { phone } = req.params;
+
+            const { data: member, error } = await supabase
+                .from('staff_members')
+                .select('staff_roles(role_name)')   // join to staff_roles table
+                .eq('phone', phone)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (!member) {
+                return ApiResponse.notFound(res, 'Staff member not found');
+            }
+
+            const roleName = member.staff_roles?.role_name || null;
+            return ApiResponse.success(res, { staff_role: roleName });
+        } catch (error) {
+            return ApiResponse.error(res, 'Failed to fetch staff member by phone');
         }
     },
 
@@ -392,7 +406,6 @@ const staffController = {
         }
     },
 
-    // Get salaries – now includes staff role
     async getSalaries(req, res) {
         try {
             const { apartmentId } = req.params;
@@ -417,7 +430,6 @@ const staffController = {
         }
     },
 
-    // Update salary payment
     async updateSalary(req, res) {
         try {
             const { id } = req.params;
