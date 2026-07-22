@@ -6,7 +6,7 @@ import { setupSidebar } from '../components/sidebar.js';
 export default async function loginPage() {
     console.log('✅ loginPage loaded!');
 
-    // Hide the main app (it would be hidden anyway, but just in case)
+    // Hide the main app
     const app = document.getElementById('app');
     if (app) app.style.display = 'none';
 
@@ -128,14 +128,12 @@ export default async function loginPage() {
                 if (response.success) {
                     showToast('Welcome back!', 'success');
 
-                    // Remove overlay and show the app immediately
+                    // Show app and navigate instantly
                     overlay.remove();
                     if (app) app.style.display = '';
-
-                    // Navigate right away — sidebar will load in the background
                     router.navigateByRole();
 
-                    // Kick off sidebar setup without blocking navigation
+                    // Sidebar loads in background – won't slow down login
                     setupSidebar().catch(err => console.error('Sidebar setup error:', err));
                 } else {
                     throw new Error(response.message || 'Login failed');
