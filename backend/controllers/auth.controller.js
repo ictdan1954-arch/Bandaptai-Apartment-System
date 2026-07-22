@@ -10,34 +10,28 @@ const authController = {
         try {
             const { full_name, email, phone, password, role, username } = req.body;
 
-            // Validate required fields
             const missing = validateRequired(req.body, ['full_name', 'phone', 'password', 'role']);
             if (missing.length > 0) {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
             }
 
-            // Validate role - now includes 'staff'
             if (!['landlord', 'caretaker', 'tenant', 'staff'].includes(role)) {
                 return ApiResponse.badRequest(res, 'Invalid role');
             }
 
-            // Only landlord can create caretaker accounts
             if (role === 'caretaker' && req.user?.role !== 'landlord') {
                 return ApiResponse.forbidden(res, 'Only landlord can create caretaker accounts');
             }
 
-            // Validate phone
             if (!validatePhone(phone)) {
                 return ApiResponse.badRequest(res, 'Invalid phone number');
             }
 
-            // Validate password
             const passwordError = validatePassword(password);
             if (passwordError) {
                 return ApiResponse.badRequest(res, passwordError);
             }
 
-            // Validate username if provided
             if (username) {
                 const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
                 if (!usernameRegex.test(username)) {
@@ -45,7 +39,6 @@ const authController = {
                 }
             }
 
-            // Check if user exists (by phone, email, or username)
             const { data: existingUser } = await supabase
                 .from('users')
                 .select('id')
@@ -56,11 +49,9 @@ const authController = {
                 return ApiResponse.badRequest(res, 'User with this phone, email, or username already exists');
             }
 
-            // Hash password
             const salt = await bcrypt.genSalt(10);
             const password_hash = await bcrypt.hash(password, salt);
 
-            // Create user
             const { data: newUser, error } = await supabase
                 .from('users')
                 .insert([
@@ -81,7 +72,6 @@ const authController = {
                 return ApiResponse.error(res, 'Failed to create user');
             }
 
-            // Generate token (optional, usually not needed for admin-created accounts)
             const token = generateToken(newUser);
 
             return ApiResponse.created(res, {
@@ -98,7 +88,7 @@ const authController = {
     // Login – accepts username, email, or phone
     async login(req, res) {
         try {
-            const { phone, password } = req.body; // "phone" field is used for any identifier
+            const { phone, password } = req.body;
             const identifier = phone?.trim();
 
             const missing = validateRequired(req.body, ['phone', 'password']);
@@ -106,10 +96,8 @@ const authController = {
                 return ApiResponse.badRequest(res, `Missing fields: ${missing.join(', ')}`);
             }
 
-            // Sanitize identifier to prevent filter injection
             const safeIdentifier = identifier.replace(/'/g, "''");
 
-            // Find user by username, email, or phone
             const { data: user, error } = await supabase
                 .from('users')
                 .select('*')
@@ -121,10 +109,26 @@ const authController = {
                 return ApiResponse.unauthorized(res, 'Invalid credentials');
             }
 
-            // Compare password
             const isMatch = await bcrypt.compare(password, user.password_hash);
             if (!isMatch) {
                 return ApiResponse.unauthorized(res, 'Invalid credentials');
+            }
+
+            // ================================================
+            // FETCH STAFF SUB-ROLE FOR STAFF USERS
+            // ================================================
+            let staff_role = null;
+            if (user.role === 'staff') {
+                const { data: staffRecord } = await supabase
+                    .from('staff_members')
+                    .select('staff_role_id(role_name)')   // adjust if you have a plain column like 'staff_role'
+                    .eq('phone', user.phone)
+                    .maybeSingle();
+
+                if (staffRecord?.staff_role_id) {
+                    staff_role = staffRecord.staff_role_id.role_name;   // e.g., 'cleaner'
+                }
+                // If your table has a direct column: staff_role = staffRecord?.staff_role;
             }
 
             // Update last login
@@ -133,11 +137,17 @@ const authController = {
                 .update({ last_login: new Date().toISOString() })
                 .eq('id', user.id);
 
-            // Generate token
-            const token = generateToken(user);
+            // Build the payload for JWT – include staff_role
+            const tokenPayload = {
+                id: user.id,
+                role: user.role,
+                staff_role: staff_role || null    // <-- added to token
+            };
+            const token = generateToken(tokenPayload);
 
-            // Remove password from response
+            // Remove password and attach staff_role to the response user object
             const { password_hash, ...userWithoutPassword } = user;
+            userWithoutPassword.staff_role = staff_role || null;
 
             return ApiResponse.success(res, {
                 user: userWithoutPassword,
@@ -150,7 +160,7 @@ const authController = {
         }
     },
 
-    // Get current user profile
+    // Get current user profile (now includes staff_role)
     async getProfile(req, res) {
         try {
             const { data: user, error } = await supabase
@@ -161,6 +171,18 @@ const authController = {
 
             if (error || !user) {
                 return ApiResponse.notFound(res, 'User not found');
+            }
+
+            // Attach staff_role for staff users
+            if (user.role === 'staff') {
+                const { data: staffRecord } = await supabase
+                    .from('staff_members')
+                    .select('staff_role_id(role_name)')
+                    .eq('phone', user.phone)
+                    .maybeSingle();
+                user.staff_role = staffRecord?.staff_role_id?.role_name || null;
+            } else {
+                user.staff_role = null;
             }
 
             return ApiResponse.success(res, user);
@@ -194,11 +216,11 @@ const authController = {
 
     // Update user (Landlord full access, Caretaker only staff/tenants in their apartment)
     async updateUser(req, res) {
+        // (unchanged – keep your existing implementation)
         try {
             const { userId } = req.params;
             const { full_name, password, username } = req.body;
 
-            // Get the target user
             const { data: targetUser, error: fetchError } = await supabase
                 .from('users')
                 .select('id, phone, role')
@@ -209,16 +231,12 @@ const authController = {
                 return ApiResponse.notFound(res, 'User not found');
             }
 
-            // Caretaker restrictions
             if (req.user.role === 'caretaker') {
-                // 1. Cannot edit themselves
                 if (targetUser.id === req.user.id) {
                     return ApiResponse.forbidden(res, 'You cannot edit your own account');
                 }
 
-                // 2. If the target is a tenant, check that they live in one of the caretaker's apartments
                 if (targetUser.role === 'tenant') {
-                    // Find the tenant's apartment through their unit
                     const { data: tenantData } = await supabase
                         .from('tenants')
                         .select('unit_id, units!inner(apartment_id)')
@@ -234,7 +252,6 @@ const authController = {
                         return ApiResponse.forbidden(res, 'Tenant does not have an apartment');
                     }
 
-                    // Check if the caretaker is assigned to that apartment
                     const { data: assignment } = await supabase
                         .from('caretaker_assignments')
                         .select('id')
@@ -248,7 +265,6 @@ const authController = {
                     }
                 }
 
-                // 3. If the target is a staff member (not tenant), verify they work in the caretaker's apartment
                 if (targetUser.role !== 'tenant') {
                     const { data: staff } = await supabase
                         .from('staff_members')
@@ -274,8 +290,6 @@ const authController = {
                 }
             }
 
-            // Landlord has no restrictions
-
             const updateData = {};
             if (full_name) updateData.full_name = full_name;
             if (username) {
@@ -283,7 +297,6 @@ const authController = {
                 if (!usernameRegex.test(username)) {
                     return ApiResponse.badRequest(res, 'Username must be 3-30 characters and contain only letters, numbers, and underscores');
                 }
-                // Check uniqueness
                 const { data: existing } = await supabase
                     .from('users')
                     .select('id')
@@ -326,10 +339,9 @@ const authController = {
         }
     },
 
-    // ====================================================
     // Update own profile (any authenticated user)
-    // ====================================================
     async updateProfile(req, res) {
+        // (unchanged – keep your existing implementation)
         try {
             const userId = req.user.id;
             const { username, password, profile_photo } = req.body;
@@ -340,7 +352,6 @@ const authController = {
                 if (!usernameRegex.test(username)) {
                     return ApiResponse.badRequest(res, 'Username must be 3-30 characters and contain only letters, numbers, underscores');
                 }
-                // Check uniqueness
                 const { data: existing } = await supabase
                     .from('users')
                     .select('id')
