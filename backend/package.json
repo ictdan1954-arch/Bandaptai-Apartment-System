@@ -1,7 +1,7 @@
 {
   "name": "bandaptai-apartments-backend",
   "version": "1.0.0",
-  "description": "Bandaptai Apartments Management System - Backend API",
+  "description": "Rikim Apartments Management System - Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
