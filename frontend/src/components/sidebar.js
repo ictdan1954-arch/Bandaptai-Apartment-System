@@ -3,7 +3,6 @@ import { apiService } from '../services/api.service.js';
 import { showToast } from '../components/toast.js';
 import { router } from '../router.js';
 
-// Track whether we've already bound the hashchange listener
 let hashChangeBound = false;
 
 // =============================================
@@ -11,24 +10,22 @@ let hashChangeBound = false;
 // =============================================
 export async function setupSidebar() {
     if (!authService.isAuthenticated()) {
-        // User not logged in – hide sidebar
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.style.display = 'none';
         return;
     }
 
-    // Make sidebar visible
     const sidebar = document.getElementById('sidebar');
     if (sidebar) sidebar.style.display = 'flex';
 
     const nav = document.getElementById('sidebar-nav');
     const role = authService.getRole();
-    const menuItems = getMenuItems(role);
+    const staffRole = authService.getStaffRole(); // e.g., 'cleaner'
 
-    // Render the navigation
+    const menuItems = getMenuItems(role, staffRole);
     renderNav(nav, menuItems);
 
-    // Caretaker: replace generic "My Apartments" with actual apartment list
+    // ----- Caretaker: replace generic "My Apartments" with actual assigned apartments -----
     if (role === 'caretaker') {
         try {
             const response = await apiService.get('/apartments');
@@ -52,29 +49,26 @@ export async function setupSidebar() {
                 });
             }
         } catch (e) {
-            // leave default "My Apartments" link if fetch fails
+            // leave default "My Apartments" if fetch fails
         }
     }
 
-    // Re-attach click handlers to all navigation links (including new ones)
+    // ----- Attach click handlers to close sidebar on mobile -----
     nav.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
             sidebar.classList.remove('open');
         });
     });
 
-    // Attach messages handler for tenants
+    // ----- Tenant messages handler -----
     if (role === 'tenant') {
         attachTenantMessageHandler();
     }
 
-    // =============================================
-    // PROFILE MODAL (click on user info area)
-    // =============================================
+    // ----- Profile modal (click on user info) -----
     const userInfoEl = document.querySelector('.user-info');
     if (userInfoEl) {
         userInfoEl.style.cursor = 'pointer';
-        // Remove any previous click listener to avoid duplicate modals
         if (userInfoEl._clickHandler) {
             userInfoEl.removeEventListener('click', userInfoEl._clickHandler);
         }
@@ -86,10 +80,10 @@ export async function setupSidebar() {
         userInfoEl.addEventListener('click', clickHandler);
     }
 
-    // Avatar update (run here + can also be called standalone)
+    // ----- User info (name, role, avatar) -----
     updateSidebarUserInfo();
 
-    // Highlight active link
+    // ----- Active link highlighting -----
     updateActiveLink();
     if (!hashChangeBound) {
         window.addEventListener('hashchange', updateActiveLink);
@@ -126,11 +120,24 @@ export function updateSidebarUserInfo() {
 }
 
 // =============================================
-// PRIVATE HELPERS
+// PRIVATE: MENU DEFINITIONS
 // =============================================
+function getMenuItems(role, staffRole) {
+    // If the user is a staff member with a specific sub-role, use that menu
+    if (role === 'staff' && staffRole === 'cleaner') {
+        return [
+            { section: 'MAIN', items: [
+                { icon: 'fa-th-large', text: 'Dashboard', href: '/cleaning/dashboard' }
+            ]},
+            { section: 'MY WORK', items: [
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/cleaning/dashboard' },
+                { icon: 'fa-box', text: 'Supplies', href: '/cleaning/dashboard' },
+                { icon: 'fa-history', text: 'My Salary', href: '/cleaning/dashboard' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/cleaning/dashboard' }
+            ]}
+        ];
+    }
 
-function getMenuItems(role) {
-    // (unchanged – your original menu definitions)
     const landlordMenu = [
         { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' }] },
         { section: 'PROPERTIES', items: [
@@ -196,6 +203,9 @@ function getMenuItems(role) {
     return [];
 }
 
+// =============================================
+// PRIVATE: RENDER NAVIGATION
+// =============================================
 function renderNav(container, menuItems) {
     let html = '';
     menuItems.forEach(section => {
@@ -213,6 +223,9 @@ function renderNav(container, menuItems) {
     container.innerHTML = html;
 }
 
+// =============================================
+// PRIVATE: ACTIVE LINK HIGHLIGHTING
+// =============================================
 function updateActiveLink() {
     const currentHash = window.location.hash.slice(1) || '/dashboard';
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -221,13 +234,19 @@ function updateActiveLink() {
         if (currentHash.startsWith(href) || (href === '/dashboard' && currentHash === '/dashboard')) {
             link.classList.add('active');
         }
+        // Also highlight '/cleaning/dashboard' for all cleaner sub-links (they all point to same page)
+        if (href === '/cleaning/dashboard' && currentHash.startsWith('/cleaning/dashboard')) {
+            link.classList.add('active');
+        }
     });
 }
 
+// =============================================
+// PRIVATE: TENANT MESSAGE HANDLER
+// =============================================
 function attachTenantMessageHandler() {
     const messagesLink = document.querySelector('.nav-link[data-href="/messages"]');
     if (!messagesLink) return;
-    // Remove old listener to prevent duplicates
     messagesLink.removeEventListener('click', tenantMessageClickHandler);
     messagesLink.addEventListener('click', tenantMessageClickHandler);
 }
