@@ -4,12 +4,12 @@ import { CONFIG } from '../config/constants.js';
 class AuthService {
     constructor() {
         this.user = null;
-        this.token = localStorage.getItem('bandaptai_token');
+        this.token = localStorage.getItem('rikim_token');
         this.loadUser();
     }
 
     loadUser() {
-        const userStr = localStorage.getItem('bandaptai_user');
+        const userStr = localStorage.getItem('rikim_user');
         if (userStr) {
             try {
                 this.user = JSON.parse(userStr);
@@ -21,12 +21,12 @@ class AuthService {
 
     saveUser(user) {
         this.user = user;
-        localStorage.setItem('bandaptai_user', JSON.stringify(user));
+        localStorage.setItem('rikim_user', JSON.stringify(user));
     }
 
     saveToken(token) {
         this.token = token;
-        localStorage.setItem('bandaptai_token', token);
+        localStorage.setItem('rikim_token', token);
     }
 
     getRole() {
