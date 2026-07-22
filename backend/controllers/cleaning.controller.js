@@ -347,6 +347,43 @@ const cleaningController = {
     },
 
     // =============================================
+    // GET MY CARETAKER (for chat / contact)
+    // =============================================
+    async getMyCaretaker(req, res) {
+        try {
+            // Find the staff member record using phone number (always available)
+            const { data: staffRecord, error: staffError } = await supabase
+                .from('staff_members')
+                .select('id, apartment_id')
+                .eq('phone', req.user.phone)
+                .maybeSingle();
+
+            if (staffError || !staffRecord) {
+                return ApiResponse.notFound(res, 'Staff record not found');
+            }
+
+            const apartmentId = staffRecord.apartment_id;
+
+            // Get the first active caretaker assigned to that apartment
+            const { data: caretakers, error: ctError } = await supabase
+                .from('caretaker_assignments')
+                .select('user_id, users:user_id(full_name)')
+                .eq('apartment_id', apartmentId)
+                .eq('is_active', true)
+                .limit(1);
+
+            if (ctError) throw ctError;
+
+            const caretaker = caretakers?.[0] || null;
+
+            return ApiResponse.success(res, caretaker);
+        } catch (error) {
+            console.error('Error fetching caretaker:', error);
+            return ApiResponse.error(res, 'Failed to fetch caretaker');
+        }
+    },
+
+    // =============================================
     // GET NOTIFICATIONS
     // =============================================
     async getNotifications(req, res) {
