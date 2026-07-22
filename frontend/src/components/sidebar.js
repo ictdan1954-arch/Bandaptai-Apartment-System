@@ -16,14 +16,13 @@ export async function setupSidebar() {
     }
 
     const sidebar = document.getElementById('sidebar');
-    if (!sidebar) return;   // safety check
+    if (!sidebar) return;
     sidebar.style.display = 'flex';
 
     // ---------- ENSURE staff_role IS AVAILABLE ----------
     let role = authService.getRole();
     let staffRole = authService.getStaffRole();
 
-    // If staff_role missing, fetch it from the backend
     if (role === 'staff' && !staffRole) {
         try {
             const phone = authService.user.phone;
@@ -40,22 +39,21 @@ export async function setupSidebar() {
         staffRole = staffRole.toLowerCase();
     }
 
-    // Override the main role for any known staff sub‑role
     const knownSubRoles = ['cleaner', 'electrician', 'plumber', 'gardener'];
     if (role === 'staff' && staffRole && knownSubRoles.includes(staffRole)) {
         role = staffRole;
     }
 
-    // Build navigation (with null check)
     const nav = document.getElementById('sidebar-nav');
     if (!nav) {
-        console.error('Sidebar nav element #sidebar-nav not found in the DOM');
+        console.error('Sidebar nav element #sidebar-nav not found');
         return;
     }
+
     const menuItems = getMenuItems(role);
     renderNav(nav, menuItems);
 
-    // ----- Caretaker: replace generic "My Apartments" with actual assigned apartments -----
+    // ----- Caretaker apartments -----
     if (role === 'caretaker') {
         try {
             const response = await apiService.get('/apartments');
@@ -78,22 +76,22 @@ export async function setupSidebar() {
                     }
                 });
             }
-        } catch (e) { /* leave default */ }
+        } catch (e) { /* ignore */ }
     }
 
-    // ----- Attach click handlers to close sidebar on mobile -----
+    // ----- Close sidebar on mobile -----
     nav.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
             sidebar.classList.remove('open');
         });
     });
 
-    // ----- Tenant messages handler -----
+    // ----- Tenant messages -----
     if (role === 'tenant') {
         attachTenantMessageHandler();
     }
 
-    // ----- Profile modal (click on user info) -----
+    // ----- Profile modal -----
     const userInfoEl = document.querySelector('.user-info');
     if (userInfoEl) {
         userInfoEl.style.cursor = 'pointer';
@@ -108,10 +106,8 @@ export async function setupSidebar() {
         userInfoEl.addEventListener('click', clickHandler);
     }
 
-    // ----- User info (name, role, avatar) -----
+    // ----- User info, active link, etc. -----
     updateSidebarUserInfo();
-
-    // ----- Active link highlighting -----
     updateActiveLink();
     if (!hashChangeBound) {
         window.addEventListener('hashchange', updateActiveLink);
@@ -153,6 +149,7 @@ export function updateSidebarUserInfo() {
 // PRIVATE: MENU DEFINITIONS
 // =============================================
 function getMenuItems(role) {
+    // ---------- SUB‑ROLE MENUS ----------
     if (role === 'cleaner') {
         return [
             { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/cleaning/dashboard' }] },
@@ -164,13 +161,103 @@ function getMenuItems(role) {
             ]}
         ];
     }
-    if (role === 'electrician') { /* ... same pattern ... */ }
-    if (role === 'plumber') { /* ... */ }
-    if (role === 'gardener') { /* ... */ }
 
-    // (Landlord, caretaker, tenant, staff menus – unchanged)
-    // ...
-    // fallback
+    if (role === 'electrician') {
+        return [
+            { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/electrician/dashboard' }] },
+            { section: 'MY WORK', items: [
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/electrician/dashboard' },
+                { icon: 'fa-tools', text: 'Supplies', href: '/electrician/dashboard' },
+                { icon: 'fa-history', text: 'My Salary', href: '/electrician/dashboard' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/electrician/dashboard' }
+            ]}
+        ];
+    }
+
+    if (role === 'plumber') {
+        return [
+            { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/plumber/dashboard' }] },
+            { section: 'MY WORK', items: [
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/plumber/dashboard' },
+                { icon: 'fa-wrench', text: 'Supplies', href: '/plumber/dashboard' },
+                { icon: 'fa-history', text: 'My Salary', href: '/plumber/dashboard' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/plumber/dashboard' }
+            ]}
+        ];
+    }
+
+    if (role === 'gardener') {
+        return [
+            { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/gardener/dashboard' }] },
+            { section: 'MY WORK', items: [
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/gardener/dashboard' },
+                { icon: 'fa-seedling', text: 'Supplies', href: '/gardener/dashboard' },
+                { icon: 'fa-history', text: 'My Salary', href: '/gardener/dashboard' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/gardener/dashboard' }
+            ]}
+        ];
+    }
+
+    // ---------- MAIN ROLE MENUS ----------
+    const landlordMenu = [
+        { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' }] },
+        { section: 'PROPERTIES', items: [
+            { icon: 'fa-building', text: 'Apartments', href: '/apartments' },
+            { icon: 'fa-door-open', text: 'Units', href: '/units/all' }
+        ]},
+        { section: 'PEOPLE', items: [
+            { icon: 'fa-users', text: 'Tenants', href: '/tenants' },
+            { icon: 'fa-user-tie', text: 'Staff Roles', href: '/staff/roles' },
+            { icon: 'fa-user-friends', text: 'Staff Members', href: '/staff/members' }
+        ]},
+        { section: 'FINANCES', items: [
+            { icon: 'fa-money-bill-wave', text: 'Rent Payments', href: '/payments/rent' },
+            { icon: 'fa-hand-holding-usd', text: 'Staff Salaries', href: '/payments/salaries' },
+            { icon: 'fa-receipt', text: 'Expenses', href: '/expenses' }
+        ]},
+        { section: 'MANAGEMENT', items: [
+            { icon: 'fa-tools', text: 'Maintenance', href: '/maintenance' }
+        ]}
+    ];
+
+    const caretakerMenu = [
+        { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' }] },
+        { section: 'PROPERTIES', items: [
+            { icon: 'fa-building', text: 'My Apartments', href: '/apartments' }
+        ]},
+        { section: 'PEOPLE', items: [
+            { icon: 'fa-users', text: 'Tenants', href: '/tenants' },
+            { icon: 'fa-user-friends', text: 'Staff Members', href: '/staff/members' }
+        ]},
+        { section: 'FINANCES', items: [
+            { icon: 'fa-money-bill-wave', text: 'Rent Payments', href: '/payments/rent' },
+            { icon: 'fa-hand-holding-usd', text: 'Staff Salaries', href: '/payments/salaries' },
+            { icon: 'fa-receipt', text: 'Expenses', href: '/expenses' }
+        ]},
+        { section: 'MANAGEMENT', items: [
+            { icon: 'fa-tools', text: 'Maintenance', href: '/maintenance' }
+        ]}
+    ];
+
+    const tenantMenu = [
+        { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' }] },
+        { section: 'MY STUFF', items: [
+            { icon: 'fa-history', text: 'Payment History', href: '/tenants/my' },
+            { icon: 'fa-tools', text: 'Maintenance', href: '/maintenance/tenant' },
+            { icon: 'fa-envelope', text: 'Messages', href: '/messages' }
+        ]}
+    ];
+
+    const staffMenu = [
+        { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/dashboard' }] },
+        { section: 'MY WORK', items: [
+            { icon: 'fa-history', text: 'My Salary', href: '/dashboard' },
+            { icon: 'fa-tasks', text: 'My Tasks', href: '/dashboard' },
+            { icon: 'fa-bullhorn', text: 'Announcements', href: '/dashboard' }
+        ]}
+    ];
+
+    // Fallback order
     if (role === 'landlord') return landlordMenu;
     if (role === 'caretaker') return caretakerMenu;
     if (role === 'tenant') return tenantMenu;
@@ -179,10 +266,10 @@ function getMenuItems(role) {
 }
 
 // =============================================
-// PRIVATE: RENDER NAVIGATION (with null guard)
+// PRIVATE: RENDER NAVIGATION
 // =============================================
 function renderNav(container, menuItems) {
-    if (!container) return;   // <-- prevents the crash
+    if (!container) return;
     let html = '';
     menuItems.forEach(section => {
         html += `<div class="nav-section">
@@ -220,4 +307,49 @@ function updateActiveLink() {
 // =============================================
 // PRIVATE: TENANT MESSAGE HANDLER
 // =============================================
-// (unchanged)
+function attachTenantMessageHandler() {
+    const messagesLink = document.querySelector('.nav-link[data-href="/messages"]');
+    if (!messagesLink) return;
+    messagesLink.removeEventListener('click', tenantMessageClickHandler);
+    messagesLink.addEventListener('click', tenantMessageClickHandler);
+}
+
+async function tenantMessageClickHandler(e) {
+    e.preventDefault();
+    try {
+        const dashRes = await apiService.get('/dashboard/tenant');
+        if (!dashRes.success || !dashRes.data.tenant) {
+            showToast('Could not load your apartment info', 'error');
+            return;
+        }
+        const tenant = dashRes.data.tenant;
+        const caretakerRes = await apiService.get(`/apartments/${tenant.apartment_id}/caretakers`);
+        if (!caretakerRes.success || !caretakerRes.data.length) {
+            showToast('No caretaker assigned to your apartment', 'warning');
+            return;
+        }
+        const caretakers = caretakerRes.data;
+        if (caretakers.length === 1) {
+            const c = caretakers[0];
+            const { openChatModal } = await import('./chat.js');
+            openChatModal(authService.user?.id, c.user_id, c.users?.full_name);
+        } else {
+            const { showFormModal } = await import('./modal.js');
+            const formHtml = `
+                <div class="form-group">
+                    <label class="form-label">Select Caretaker</label>
+                    <select class="form-select" id="caretaker-select">
+                        ${caretakers.map(c => `<option value="${c.user_id}">${c.users?.full_name}</option>`).join('')}
+                    </select>
+                </div>`;
+            showFormModal('Message Caretaker', formHtml, async (overlay) => {
+                const selectedId = overlay.querySelector('#caretaker-select').value;
+                const selectedName = caretakers.find(c => c.user_id === selectedId)?.users?.full_name;
+                const { openChatModal } = await import('./chat.js');
+                openChatModal(authService.user?.id, selectedId, selectedName);
+            });
+        }
+    } catch (err) {
+        showToast('Failed to load caretakers', 'error');
+    }
+}
