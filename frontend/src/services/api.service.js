@@ -6,7 +6,7 @@ class ApiService {
     }
 
     getToken() {
-        return localStorage.getItem('bandaptai_token');
+        return localStorage.getItem('rikim_token');
     }
 
     getHeaders() {
