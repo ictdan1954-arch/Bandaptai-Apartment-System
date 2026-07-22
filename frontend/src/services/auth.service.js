@@ -8,6 +8,7 @@ class AuthService {
         this.loadUser();
     }
 
+    // Restore user from localStorage
     loadUser() {
         const userStr = localStorage.getItem('rikim_user');
         if (userStr) {
@@ -17,6 +18,8 @@ class AuthService {
                 this.user = null;
             }
         }
+        // Always ensure staff_role is up‑to‑date from the token (if any)
+        this._mergeStaffRoleFromToken();
     }
 
     saveUser(user) {
@@ -27,8 +30,36 @@ class AuthService {
     saveToken(token) {
         this.token = token;
         localStorage.setItem('rikim_token', token);
+        // After saving a new token, immediately pull staff_role from it
+        this._mergeStaffRoleFromToken();
     }
 
+    // ---------- TOKEN DECODING ----------
+    _decodeTokenPayload() {
+        if (!this.token) return null;
+        try {
+            // JWT structure: header.payload.signature
+            const payloadBase64 = this.token.split('.')[1];
+            const payloadJson = atob(payloadBase64);
+            return JSON.parse(payloadJson);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _mergeStaffRoleFromToken() {
+        const payload = this._decodeTokenPayload();
+        if (payload && payload.staff_role) {
+            if (!this.user) {
+                this.user = {};
+            }
+            this.user.staff_role = payload.staff_role;
+            // Persist the updated user object so the next page load has it
+            localStorage.setItem('rikim_user', JSON.stringify(this.user));
+        }
+    }
+
+    // ---------- ROLE HELPERS ----------
     getRole() {
         return this.user?.role || null;
     }
@@ -41,12 +72,13 @@ class AuthService {
         return !!this.token && !!this.user;
     }
 
-    // ✅ FIXED: Uses 'phone' field (backend expects this)
+    // ---------- AUTH ACTIONS ----------
     async login(phone, password) {
         const response = await apiService.post(CONFIG.ENDPOINTS.AUTH.LOGIN, { phone, password });
         if (response.success) {
             this.saveToken(response.data.token);
             this.saveUser(response.data.user);
+            // saveToken already calls _mergeStaffRoleFromToken, so staff_role is now set
         }
         return response;
     }
