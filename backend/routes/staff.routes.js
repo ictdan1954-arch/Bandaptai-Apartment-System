@@ -9,6 +9,7 @@ router.use(authenticate);
 // Staff Roles (Landlord only)
 router.post('/roles', authorize('landlord'), staffController.createRole);
 router.get('/roles', authorize('landlord', 'caretaker'), staffController.getRoles);
+router.put('/roles/:id', authorize('landlord'), staffController.updateRole); // <-- ADD THIS LINE
 router.delete('/roles/:id', authorize('landlord'), staffController.deleteRole);
 
 // Staff Members
@@ -31,7 +32,7 @@ router.post('/accounts', authorize('landlord', 'caretaker'), staffController.cre
 // Staff Salaries
 router.post('/salaries', authorize('landlord', 'caretaker'), staffController.recordSalary);
 router.get('/salaries/apartment/:apartmentId', authorize('landlord', 'caretaker'), staffController.getSalaries);
-router.put('/salaries/:id', authorize('landlord', 'caretaker'), staffController.updateSalary);   // <-- NEW
+router.put('/salaries/:id', authorize('landlord', 'caretaker'), staffController.updateSalary);
 router.delete('/salaries/:id', authorize('landlord'), staffController.deleteSalary);
 
 module.exports = router;
