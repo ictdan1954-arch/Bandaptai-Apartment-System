@@ -3,32 +3,25 @@ import { authService } from '../../services/auth.service.js';
 import { showToast } from '../../components/toast.js';
 
 export default async function cleanerDashboard(container) {
-    // Determine which section to show (if any)
-    const hash = window.location.hash;                // e.g., "#/cleaning/dashboard#tasks"
-    const sectionHash = hash.split('#').pop();        // "tasks", "supplies", etc.
+    const hash = window.location.hash;
+    const sectionHash = hash.split('#').pop();
     const section = ['tasks', 'supplies', 'salary', 'messages'].includes(sectionHash) ? sectionHash : null;
 
-    // When a specific section is requested, show a back button
+    // If a specific section is requested, show only that card with a back button
     if (section) {
         container.innerHTML = `
-            <div class="page-header" style="display:flex;align-items:center;gap:1rem;">
-                <a href="#/cleaning/dashboard" class="btn btn-sm btn-outline-secondary" style="margin-right:auto;">
-                    ← Back to Dashboard
-                </a>
+            <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem;">
+                <a href="#/cleaning/dashboard" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
             </div>
             <div id="section-content"></div>
         `;
-        const sectionContainer = document.getElementById('section-content');
-        // Render only the requested card
-        sectionContainer.innerHTML = getCardHTML(section);
-        // Load data only for that card
+        document.getElementById('section-content').innerHTML = getCardHTML(section);
         await loadSectionData(section);
-        // Re‑run hash detection if the user clicks another sidebar link
         window.addEventListener('hashchange', () => cleanerDashboard(container), { once: true });
         return;
     }
 
-    // ---------- FULL DASHBOARD (no section specified) ----------
+    // ----- Full dashboard layout -----
     container.innerHTML = `
         <div class="page-header">
             <h2>🧹 Cleaning Dashboard</h2>
@@ -53,7 +46,6 @@ export default async function cleanerDashboard(container) {
             </div>
         </div>
 
-        <!-- All cards are rendered -->
         <div class="card" id="attendance">
             <div class="card-header">🕒 Today's Attendance</div>
             <div class="card-body" id="attendance-container"><p>Loading...</p></div>
@@ -92,7 +84,7 @@ export default async function cleanerDashboard(container) {
         </div>
     `;
 
-    // Load all sections
+    // Load all sections in parallel
     await Promise.allSettled([
         loadAttendance(),
         loadAnnouncements(),
@@ -104,23 +96,17 @@ export default async function cleanerDashboard(container) {
         updateQuickStats()
     ]);
 
-    // Re‑run component when hash changes (so back button works)
     window.addEventListener('hashchange', () => cleanerDashboard(container), { once: true });
 }
 
-// ---------- HELPERS ----------
+// ---------- SECTION-ONLY HELPERS ----------
 function getCardHTML(section) {
     switch (section) {
-        case 'tasks':
-            return `<div class="card" id="tasks"><div class="card-header">📋 My Tasks</div><div class="card-body" id="tasks-container"><p>Loading tasks...</p></div></div>`;
-        case 'supplies':
-            return `<div class="card" id="supplies"><div class="card-header">🧴 Supplies</div><div class="card-body" id="supplies-container"><p>Loading supplies...</p></div></div>`;
-        case 'salary':
-            return `<div class="card" id="salary"><div class="card-header">💰 My Salary</div><div class="card-body" id="salary-container"><p>Loading salary...</p></div></div>`;
-        case 'messages':
-            return `<div class="card" id="messages"><div class="card-header">💬 Messages</div><div class="card-body" id="messages-container"><button id="open-chat-btn" class="btn btn-primary btn-sm">Chat with Caretaker</button></div></div>`;
-        default:
-            return '';
+        case 'tasks':    return `<div class="card" id="tasks"><div class="card-header">📋 My Tasks</div><div class="card-body" id="tasks-container"><p>Loading tasks...</p></div></div>`;
+        case 'supplies': return `<div class="card" id="supplies"><div class="card-header">🧴 Supplies</div><div class="card-body" id="supplies-container"><p>Loading supplies...</p></div></div>`;
+        case 'salary':   return `<div class="card" id="salary"><div class="card-header">💰 My Salary</div><div class="card-body" id="salary-container"><p>Loading salary...</p></div></div>`;
+        case 'messages': return `<div class="card" id="messages"><div class="card-header">💬 Messages</div><div class="card-body" id="messages-container"><button id="open-chat-btn" class="btn btn-primary btn-sm">Chat with Caretaker</button></div></div>`;
+        default: return '';
     }
 }
 
@@ -133,17 +119,71 @@ async function loadSectionData(section) {
     }
 }
 
-// ---------- DATA FETCHES (unchanged except minor guards) ----------
+// ---------- DATA FETCH FUNCTIONS ----------
 async function loadAttendance() {
     const container = document.getElementById('attendance-container');
     if (!container) return;
-    // … (your existing attendance code) …
+    const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
+    container.innerHTML = `
+        <div class="attendance-row">
+            <div class="attendance-item">
+                <span class="label">Check‑In</span>
+                <span class="value" id="checkin-time">--:--</span>
+                <button id="checkin-btn" class="btn btn-sm btn-success">Check In</button>
+            </div>
+            <div class="attendance-item">
+                <span class="label">Check‑Out</span>
+                <span class="value" id="checkout-time">--:--</span>
+                <button id="checkout-btn" class="btn btn-sm btn-outline-danger" disabled>Check Out</button>
+            </div>
+            <div class="attendance-item">
+                <span class="label">Date</span>
+                <span class="value">${today}</span>
+            </div>
+        </div>
+    `;
+    const checkinTime = localStorage.getItem('cleaner_checkin_today');
+    if (checkinTime) {
+        document.getElementById('checkin-time').textContent = checkinTime;
+        document.getElementById('checkin-btn').disabled = true;
+        document.getElementById('checkout-btn').disabled = false;
+    }
+    document.getElementById('checkin-btn')?.addEventListener('click', () => {
+        const now = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('checkin-time').textContent = now;
+        localStorage.setItem('cleaner_checkin_today', now);
+        document.getElementById('checkin-btn').disabled = true;
+        document.getElementById('checkout-btn').disabled = false;
+        updateQuickStats();
+        showToast('Checked in successfully', 'success');
+    });
+    document.getElementById('checkout-btn')?.addEventListener('click', () => {
+        const now = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('checkout-time').textContent = now;
+        document.getElementById('checkout-btn').disabled = true;
+        showToast('Checked out. See you tomorrow!', 'success');
+    });
 }
 
 async function loadAnnouncements() {
     const container = document.getElementById('announcements-container');
     if (!container) return;
-    // … (existing) …
+    // Placeholder data – replace with API call
+    const announcements = [
+        { date: '2026-07-22', message: 'Deep cleaning of Block B verandahs required this Friday.', priority: 'high' },
+        { date: '2026-07-21', message: 'New cleaning supplies will be delivered on Monday.', priority: 'normal' },
+        { date: '2026-07-20', message: 'Please remember to log your hours daily.', priority: 'normal' }
+    ];
+    if (!announcements.length) {
+        container.innerHTML = '<p>No announcements.</p>';
+        return;
+    }
+    container.innerHTML = announcements.map(a => `
+        <div class="announcement-item ${a.priority}">
+            <span class="announcement-date">${new Date(a.date).toLocaleDateString('en-KE')}</span>
+            <p>${a.message}</p>
+        </div>
+    `).join('');
 }
 
 async function loadTasks() {
@@ -171,7 +211,6 @@ async function loadTasks() {
                 <div class="task-date">Due: ${task.due_date || 'N/A'}</div>
             </div>
         `).join('');
-
         document.querySelectorAll('.status-select').forEach(select => {
             select.addEventListener('change', async (e) => {
                 const taskId = e.target.dataset.taskId;
@@ -213,7 +252,6 @@ async function loadSupplies() {
             </table>
             <button id="request-supply-btn" class="btn btn-sm btn-primary mt-2">Request Supplies</button>
         `;
-
         document.getElementById('request-supply-btn')?.addEventListener('click', () => showSupplyRequestModal());
     } catch (err) {
         container.innerHTML = '<p>Error loading supplies.</p>';
@@ -223,7 +261,21 @@ async function loadSupplies() {
 async function loadTeam() {
     const container = document.getElementById('team-container');
     if (!container) return;
-    // … (existing) …
+    try {
+        const res = await apiService.get('/cleaning/team');
+        if (!res.success || !res.data.length) {
+            container.innerHTML = '<p>No other cleaners in this apartment.</p>';
+            return;
+        }
+        container.innerHTML = res.data.map(member => `
+            <div class="team-member">
+                <i class="fas fa-user-circle"></i> ${member.full_name}
+                <span class="task-count">${member.tasks_today?.total || 0} pending tasks</span>
+            </div>
+        `).join('');
+    } catch (err) {
+        container.innerHTML = '<p>Error loading team.</p>';
+    }
 }
 
 async function loadSalary() {
@@ -272,17 +324,14 @@ async function loadMessages() {
 async function updateQuickStats() {
     try {
         const res = await apiService.get('/cleaning/tasks');
-        const taskCount = res.success ? res.data.filter(t => t.status !== 'completed').length : 0;
         const statEl = document.getElementById('stat-tasks');
-        if (statEl) statEl.textContent = taskCount;
-    } catch (e) { /* ignore */ }
-
+        if (statEl) statEl.textContent = res.success ? res.data.filter(t => t.status !== 'completed').length : 0;
+    } catch (e) {}
     const checkin = localStorage.getItem('cleaner_checkin_today');
     const statCheckin = document.getElementById('stat-checkin');
     if (statCheckin) statCheckin.textContent = checkin || '--:--';
-
     const statAnn = document.getElementById('stat-announcements');
-    if (statAnn) statAnn.textContent = 3; // placeholder
+    if (statAnn) statAnn.textContent = 3;
 }
 
 async function showSupplyRequestModal() {
@@ -291,9 +340,7 @@ async function showSupplyRequestModal() {
     try {
         const res = await apiService.get('/cleaning/supplies');
         supplies = res.success ? res.data : [];
-    } catch (e) {
-        supplies = [];
-    }
+    } catch (e) { supplies = []; }
     const options = supplies.map(item => `<option value="${item.id}">${item.item_name} (${item.current_quantity} left)</option>`).join('');
     const formHtml = `
         <div class="form-group">
@@ -310,11 +357,7 @@ async function showSupplyRequestModal() {
         const quantity = overlay.querySelector('#supply-quantity').value;
         const itemName = supplies.find(i => i.id === itemId)?.item_name || '';
         try {
-            await apiService.post('/cleaning/supplies/request', {
-                supply_item_id: itemId,
-                item_name: itemName,
-                requested_quantity: parseInt(quantity)
-            });
+            await apiService.post('/cleaning/supplies/request', { supply_item_id: itemId, item_name: itemName, requested_quantity: parseInt(quantity) });
             showToast('Request sent to caretaker', 'success');
         } catch (err) {
             showToast('Failed to send request', 'error');
