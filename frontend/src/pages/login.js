@@ -6,16 +6,13 @@ import { setupSidebar } from '../components/sidebar.js';
 export default async function loginPage() {
     // =============================================
     // EARLY EXIT: USER ALREADY LOGGED IN
+    //   Uses direct token+user check to avoid a
+    //   split-second race when reading from storage.
     // =============================================
-    if (authService.isAuthenticated()) {
-        // Ensure the main app is visible (it might have been hidden previously)
+    if (authService.token && authService.user) {
         const app = document.getElementById('app');
         if (app) app.style.display = '';
-
-        // Navigate to the correct dashboard
         router.navigateByRole();
-
-        // Build the sidebar immediately (no loading spinner / overlay)
         setupSidebar().catch(err => console.error('Sidebar setup error:', err));
         return;   // stop – do NOT create the login overlay
     }
