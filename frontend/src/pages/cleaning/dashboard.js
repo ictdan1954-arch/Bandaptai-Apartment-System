@@ -13,7 +13,9 @@ export default async function cleanerDashboard(container) {
     if (section) {
         container.innerHTML = `
             <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
-                <a href="#/cleaning/dashboard" class="btn btn-sm btn-outline-secondary">← Back to Dashboard</a>
+                <a href="#/cleaning/dashboard" class="btn btn-sm btn-outline-secondary">
+                    ← Back to Dashboard
+                </a>
                 <span class="text-muted" style="text-transform:capitalize;">${section}</span>
             </div>
             <div id="section-content"></div>
@@ -24,15 +26,15 @@ export default async function cleanerDashboard(container) {
         return;
     }
 
-    // ----- DASHBOARD OVERVIEW -----
+    // ----- FULL DASHBOARD OVERVIEW -----
     container.innerHTML = `
         <div class="page-header">
             <h2>🧹 Cleaning Dashboard</h2>
             <p class="text-muted">Welcome, ${authService.user?.full_name}</p>
         </div>
 
-        <!-- Quick Stats -->
-        <div class="quick-stats">
+        <!-- Quick Stats Row -->
+        <div class="dashboard-stats">
             <div class="stat-card">
                 <i class="fas fa-tasks"></i>
                 <span class="stat-value" id="stat-tasks">0</span>
@@ -48,42 +50,50 @@ export default async function cleanerDashboard(container) {
                 <span class="stat-value" id="stat-announcements">0</span>
                 <span class="stat-label">Announcements</span>
             </div>
+            <div class="stat-card">
+                <i class="fas fa-users"></i>
+                <span class="stat-value" id="stat-team">0</span>
+                <span class="stat-label">Team</span>
+            </div>
         </div>
 
-        <!-- Main Content Grid -->
+        <!-- Main Dashboard Grid (Attendance + Announcements + Team) -->
         <div class="dashboard-grid">
-            <!-- Attendance Card -->
             <div class="card" id="attendance">
                 <div class="card-header">🕒 Today's Attendance</div>
                 <div class="card-body" id="attendance-container"><p>Loading…</p></div>
             </div>
-
-            <!-- Announcements Card -->
             <div class="card" id="announcements">
                 <div class="card-header">📢 Announcements</div>
                 <div class="card-body" id="announcements-container"><p>Loading…</p></div>
             </div>
-
-            <!-- Team Card -->
             <div class="card" id="team">
                 <div class="card-header">👥 My Team</div>
                 <div class="card-body" id="team-container"><p>Loading…</p></div>
             </div>
         </div>
 
-        <!-- Quick Actions -->
+        <!-- Quick Actions (using existing CSS) -->
         <div class="quick-actions">
-            <a href="#/cleaning/dashboard#tasks" class="btn btn-outline-primary">
-                <i class="fas fa-tasks"></i> View My Tasks
+            <a href="#/cleaning/dashboard#tasks" class="quick-action-btn">
+                <i class="fas fa-tasks"></i>
+                <span>My Tasks</span>
+                <span class="sub-text">View & update</span>
             </a>
-            <a href="#/cleaning/dashboard#supplies" class="btn btn-outline-primary">
-                <i class="fas fa-box"></i> View Supplies
+            <a href="#/cleaning/dashboard#supplies" class="quick-action-btn">
+                <i class="fas fa-box"></i>
+                <span>Supplies</span>
+                <span class="sub-text">Stock & requests</span>
             </a>
-            <a href="#/cleaning/dashboard#salary" class="btn btn-outline-primary">
-                <i class="fas fa-money-bill-wave"></i> View Salary
+            <a href="#/cleaning/dashboard#salary" class="quick-action-btn">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>My Salary</span>
+                <span class="sub-text">Payment history</span>
             </a>
-            <a href="#/cleaning/dashboard#messages" class="btn btn-outline-primary">
-                <i class="fas fa-envelope"></i> Messages
+            <a href="#/cleaning/dashboard#messages" class="quick-action-btn">
+                <i class="fas fa-envelope"></i>
+                <span>Messages</span>
+                <span class="sub-text">Chat with caretaker</span>
             </a>
         </div>
     `;
@@ -130,20 +140,20 @@ async function loadAttendance() {
     if (!container) return;
     const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' });
     container.innerHTML = `
-        <div class="attendance-row">
-            <div class="attendance-item">
-                <span class="label">Check‑In</span>
-                <span class="value" id="checkin-time">--:--</span>
-                <button id="checkin-btn" class="btn btn-sm btn-success">Check In</button>
+        <div class="attendance-row" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+            <div class="attendance-item" style="text-align:center;">
+                <span class="label" style="font-size:0.8rem; color:var(--text-muted);">Check‑In</span>
+                <span class="value" id="checkin-time" style="font-size:1.2rem; font-weight:600;">--:--</span>
+                <button id="checkin-btn" class="btn btn-sm btn-success" style="margin-top:0.25rem;">Check In</button>
             </div>
-            <div class="attendance-item">
-                <span class="label">Check‑Out</span>
-                <span class="value" id="checkout-time">--:--</span>
-                <button id="checkout-btn" class="btn btn-sm btn-outline-danger" disabled>Check Out</button>
+            <div class="attendance-item" style="text-align:center;">
+                <span class="label" style="font-size:0.8rem; color:var(--text-muted);">Check‑Out</span>
+                <span class="value" id="checkout-time" style="font-size:1.2rem; font-weight:600;">--:--</span>
+                <button id="checkout-btn" class="btn btn-sm btn-outline-danger" disabled style="margin-top:0.25rem;">Check Out</button>
             </div>
-            <div class="attendance-item">
-                <span class="label">Date</span>
-                <span class="value">${today}</span>
+            <div class="attendance-item" style="text-align:center;">
+                <span class="label" style="font-size:0.8rem; color:var(--text-muted);">Date</span>
+                <span class="value" style="font-size:1.2rem; font-weight:600;">${today}</span>
             </div>
         </div>
     `;
@@ -183,9 +193,9 @@ async function loadAnnouncements() {
         return;
     }
     container.innerHTML = announcements.map(a => `
-        <div class="announcement-item ${a.priority}">
-            <span class="announcement-date">${new Date(a.date).toLocaleDateString('en-KE')}</span>
-            <p>${a.message}</p>
+        <div class="announcement-item ${a.priority}" style="margin-bottom:0.75rem;">
+            <span class="announcement-date" style="font-size:0.8rem; color:var(--text-muted);">${new Date(a.date).toLocaleDateString('en-KE')}</span>
+            <p style="margin:0.25rem 0;">${a.message}</p>
         </div>
     `).join('');
 }
@@ -200,19 +210,19 @@ async function loadTasks() {
             return;
         }
         container.innerHTML = res.data.map(task => `
-            <div class="task-item ${task.status}">
+            <div class="task-item ${task.status}" style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem 0; border-bottom:1px solid var(--border-light);">
                 <div class="task-info">
                     <strong>${task.area_type}</strong> - ${task.description || 'No description'}
-                    <span class="badge ${task.priority}">${task.priority}</span>
+                    <span class="badge ${task.priority}" style="margin-left:0.5rem;">${task.priority}</span>
                 </div>
-                <div class="task-status">
-                    <select data-task-id="${task.id}" class="status-select">
+                <div class="task-status" style="display:flex; align-items:center; gap:0.5rem;">
+                    <select data-task-id="${task.id}" class="status-select form-select form-select-sm" style="width:auto;">
                         <option value="pending" ${task.status === 'pending' ? 'selected' : ''}>Pending</option>
                         <option value="in_progress" ${task.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
                         <option value="completed" ${task.status === 'completed' ? 'selected' : ''}>Completed</option>
                     </select>
+                    <div class="task-date" style="font-size:0.8rem; color:var(--text-muted);">Due: ${task.due_date || 'N/A'}</div>
                 </div>
-                <div class="task-date">Due: ${task.due_date || 'N/A'}</div>
             </div>
         `).join('');
         document.querySelectorAll('.status-select').forEach(select => {
@@ -242,7 +252,7 @@ async function loadSupplies() {
             return;
         }
         container.innerHTML = `
-            <table class="supply-table">
+            <table class="supply-table" style="width:100%;">
                 <thead><tr><th>Item</th><th>Quantity</th><th>Status</th></tr></thead>
                 <tbody>
                     ${res.data.map(s => `
@@ -254,7 +264,7 @@ async function loadSupplies() {
                     `).join('')}
                 </tbody>
             </table>
-            <button id="request-supply-btn" class="btn btn-sm btn-primary mt-2">Request Supplies</button>
+            <button id="request-supply-btn" class="btn btn-sm btn-primary mt-3">Request Supplies</button>
         `;
         document.getElementById('request-supply-btn')?.addEventListener('click', () => showSupplyRequestModal());
     } catch (err) {
@@ -272,9 +282,10 @@ async function loadTeam() {
             return;
         }
         container.innerHTML = res.data.map(member => `
-            <div class="team-member">
-                <i class="fas fa-user-circle"></i> ${member.full_name}
-                <span class="task-count">${member.tasks_today?.total || 0} pending tasks</span>
+            <div class="team-member" style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0;">
+                <i class="fas fa-user-circle" style="font-size:1.2rem;"></i>
+                <span>${member.full_name}</span>
+                <span class="task-count" style="font-size:0.8rem; color:var(--text-muted);">${member.tasks_today?.total || 0} pending tasks</span>
             </div>
         `).join('');
     } catch (err) {
@@ -292,10 +303,10 @@ async function loadSalary() {
             return;
         }
         container.innerHTML = res.data.map(s => `
-            <div class="salary-item">
+            <div class="salary-item" style="display:flex; justify-content:space-between; padding:0.5rem 0; border-bottom:1px solid var(--border-light);">
                 <span>${s.payment_date}</span>
                 <span>KES ${s.amount_paid.toLocaleString()}</span>
-                <span>(${s.period_start} - ${s.period_end})</span>
+                <span style="font-size:0.8rem; color:var(--text-muted);">${s.period_start} - ${s.period_end}</span>
             </div>
         `).join('');
     } catch (err) {
@@ -334,8 +345,13 @@ async function updateQuickStats() {
     const checkin = localStorage.getItem('cleaner_checkin_today');
     const statCheckin = document.getElementById('stat-checkin');
     if (statCheckin) statCheckin.textContent = checkin || '--:--';
-    const statAnn = document.getElementById('stat-announcements');
-    if (statAnn) statAnn.textContent = 3; // placeholder
+    document.getElementById('stat-announcements').textContent = 3; // placeholder
+    // Team count
+    try {
+        const teamRes = await apiService.get('/cleaning/team');
+        const teamEl = document.getElementById('stat-team');
+        if (teamEl) teamEl.textContent = teamRes.success ? teamRes.data.length : 0;
+    } catch (e) {}
 }
 
 async function showSupplyRequestModal() {
