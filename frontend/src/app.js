@@ -161,21 +161,16 @@ router.addRoute('/maintenance/tenant', {
 // APP INITIALIZATION
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Setup sidebar (menu + interactions)
+    // Sidebar & notifications are always set up
     setupSidebar();
-    
-    // Setup notifications
     setupNotifications();
-    
-    // Setup logout button
+
+    // Logout / sidebar toggle / mobile menu listeners
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            authService.logout();
-        });
+        logoutBtn.addEventListener('click', () => authService.logout());
     }
 
-    // Handle sidebar toggle
     const sidebarToggle = document.getElementById('sidebar-toggle');
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
@@ -183,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle mobile menu button
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     if (mobileMenuBtn) {
         mobileMenuBtn.addEventListener('click', () => {
@@ -191,10 +185,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Update user info in sidebar
     updateSidebarUserInfo();
-    
-    // Start the router
+
+    // =============================================
+    // IF ALREADY AUTHENTICATED, SKIP THE LOGIN PAGE
+    // =============================================
+    if (authService.isAuthenticated()) {
+        // Navigate to the correct dashboard – this changes the hash,
+        // which will trigger the router's hashchange listener and load the page.
+        router.navigateByRole();
+
+        // Build the sidebar immediately (it already ran once, but this ensures
+        // it's rebuilt with the correct menu after staff_role detection).
+        setupSidebar().catch(err => console.error(err));
+
+        // DO NOT call router.handleRoute() here – the hashchange will handle it.
+        // The login page will never be loaded, so #app stays visible.
+        return;
+    }
+
+    // Not authenticated – start the router normally (goes to /login)
     router.handleRoute();
 });
 
