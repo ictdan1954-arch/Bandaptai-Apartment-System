@@ -35,14 +35,13 @@ class Router {
         const role = authService.getRole();
         const staffRole = (authService.getStaffRole() || '').toLowerCase();
 
-        // Staff sub‑role mapping (add more as needed)
+        // Staff sub‑role mapping
         if (role === 'staff' && staffRole) {
             const subRoleMap = {
                 cleaner: '/cleaning/dashboard',
                 electrician: '/electrician/dashboard',
                 plumber: '/plumber/dashboard',
                 gardener: '/gardener/dashboard',
-                // fallback for unknown sub‑roles
             };
             const target = subRoleMap[staffRole] || '/dashboard';
             this.navigate(target);
@@ -54,7 +53,7 @@ class Router {
             landlord: '/dashboard',
             caretaker: '/dashboard',
             tenant: '/dashboard',
-            staff: '/dashboard',   // generic staff (no sub‑role)
+            staff: '/dashboard',
         };
 
         const route = roleRoutes[role] || '/dashboard';
@@ -67,6 +66,14 @@ class Router {
     async handleRoute() {
         const hash = window.location.hash.slice(1) || '/login';
         const [path, queryString] = hash.split('?');
+
+        // =============================================
+        // GUARD: If already logged in, NEVER show /login
+        // =============================================
+        if (path === '/login' && authService.isAuthenticated()) {
+            this.navigateByRole();
+            return;
+        }
 
         // Parse query parameters
         const params = {};
