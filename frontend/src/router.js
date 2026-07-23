@@ -11,14 +11,10 @@ class Router {
         window.addEventListener('load', () => this.handleRoute());
     }
 
-    // Add a route configuration
     addRoute(path, config) {
         this.routes[path] = config;
     }
 
-    // =============================================
-    // SET BODY CLASS BASED ON CURRENT ROUTE
-    // =============================================
     setBodyClass(path) {
         document.body.classList.remove('login-page', 'dashboard-page');
         if (path === '/login') {
@@ -28,14 +24,10 @@ class Router {
         }
     }
 
-    // =============================================
-    // NAVIGATE TO THE CORRECT DASHBOARD BASED ON ROLE
-    // =============================================
     navigateByRole() {
         const role = authService.getRole();
         const staffRole = (authService.getStaffRole() || '').toLowerCase();
 
-        // Staff sub‑role mapping
         if (role === 'staff' && staffRole) {
             const subRoleMap = {
                 cleaner: '/cleaning/dashboard',
@@ -48,7 +40,6 @@ class Router {
             return;
         }
 
-        // Main role mapping
         const roleRoutes = {
             landlord: '/dashboard',
             caretaker: '/dashboard',
@@ -60,17 +51,19 @@ class Router {
         this.navigate(route);
     }
 
-    // =============================================
-    // MAIN ROUTE HANDLER
-    // =============================================
     async handleRoute() {
-        const hash = window.location.hash.slice(1) || '/login';
-        const [path, queryString] = hash.split('?');
+        // Get the full hash (e.g., "/cleaning/dashboard#tasks")
+        const rawHash = window.location.hash.slice(1) || '/login';
 
-        // =============================================
-        // GUARD: If already logged in, NEVER show /login
-        // =============================================
-        if (path === '/login' && authService.isAuthenticated()) {
+        // Split off query string and internal fragment
+        const [pathWithFragment, queryString] = rawHash.split('?');
+        const [path, fragment] = pathWithFragment.split('#');   // path = "/cleaning/dashboard", fragment = "tasks"
+
+        // Use `path` for route matching, `fragment` is ignored by the router (but available to the component)
+        const hash = path;   // keep variable name consistent with the rest of the function
+
+        // Guard: if already logged in, never show /login
+        if (hash === '/login' && authService.isAuthenticated()) {
             this.navigateByRole();
             return;
         }
@@ -85,12 +78,12 @@ class Router {
         }
 
         // Find route definition (supports parameterized routes)
-        let route = this.routes[path];
+        let route = this.routes[hash];
         if (!route) {
             for (const [routePath, routeConfig] of Object.entries(this.routes)) {
                 const pattern = routePath.replace(/:\w+/g, '([^/]+)');
                 const regex = new RegExp(`^${pattern}$`);
-                const match = path.match(regex);
+                const match = hash.match(regex);
                 if (match) {
                     route = routeConfig;
                     const paramNames = (routePath.match(/:\w+/g) || []).map(p => p.slice(1));
@@ -102,19 +95,16 @@ class Router {
             }
         }
 
-        // No route found – redirect to login
         if (!route) {
             this.navigate('/login');
             return;
         }
 
-        // Authentication check
         if (route.auth && !authService.isAuthenticated()) {
             this.navigate('/login');
             return;
         }
 
-        // Role authorization (checks both main role and staff_role)
         if (route.role) {
             const userRole = authService.getRole();
             const userStaffRole = (authService.getStaffRole() || '').toLowerCase();
@@ -128,12 +118,10 @@ class Router {
             }
         }
 
-        // Update body class
-        this.setBodyClass(path);
+        this.setBodyClass(hash);
 
-        this.currentRoute = { path, params };
+        this.currentRoute = { path: hash, params };
 
-        // Page title
         if (route.title) {
             this.pageTitle.textContent = route.title;
             document.title = `${route.title} - Rikim Apartments`;
@@ -160,9 +148,6 @@ class Router {
         }
     }
 
-    // =============================================
-    // NAVIGATE TO A PATH
-    // =============================================
     navigate(path) {
         window.location.hash = path;
     }
