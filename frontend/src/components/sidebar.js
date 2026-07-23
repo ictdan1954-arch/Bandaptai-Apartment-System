@@ -154,56 +154,54 @@ export function updateSidebarUserInfo() {
 // PRIVATE: MENU DEFINITIONS
 // =============================================
 function getMenuItems(role) {
-    // Cleaner – links now point to section IDs within the dashboard
+    // Cleaner – full path + hash for dedicated views
     if (role === 'cleaner') {
         return [
             { section: 'MAIN', items: [
                 { icon: 'fa-th-large', text: 'Dashboard', href: '/cleaning/dashboard' }
             ]},
             { section: 'MY WORK', items: [
-                { icon: 'fa-tasks', text: 'My Tasks', href: '#tasks' },
-                { icon: 'fa-box', text: 'Supplies', href: '#supplies' },
-                { icon: 'fa-history', text: 'My Salary', href: '#salary' },
-                { icon: 'fa-envelope', text: 'Messages', href: '#messages' }
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/cleaning/dashboard#tasks' },
+                { icon: 'fa-box', text: 'Supplies', href: '/cleaning/dashboard#supplies' },
+                { icon: 'fa-history', text: 'My Salary', href: '/cleaning/dashboard#salary' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/cleaning/dashboard#messages' }
             ]}
         ];
     }
 
-    // Electrician
+    // Electrician (placeholder dashboards – same pattern)
     if (role === 'electrician') {
         return [
             { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/electrician/dashboard' }] },
             { section: 'MY WORK', items: [
-                { icon: 'fa-tasks', text: 'My Tasks', href: '#tasks' },
-                { icon: 'fa-tools', text: 'Supplies', href: '#supplies' },
-                { icon: 'fa-history', text: 'My Salary', href: '#salary' },
-                { icon: 'fa-envelope', text: 'Messages', href: '#messages' }
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/electrician/dashboard#tasks' },
+                { icon: 'fa-tools', text: 'Supplies', href: '/electrician/dashboard#supplies' },
+                { icon: 'fa-history', text: 'My Salary', href: '/electrician/dashboard#salary' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/electrician/dashboard#messages' }
             ]}
         ];
     }
 
-    // Plumber
     if (role === 'plumber') {
         return [
             { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/plumber/dashboard' }] },
             { section: 'MY WORK', items: [
-                { icon: 'fa-tasks', text: 'My Tasks', href: '#tasks' },
-                { icon: 'fa-wrench', text: 'Supplies', href: '#supplies' },
-                { icon: 'fa-history', text: 'My Salary', href: '#salary' },
-                { icon: 'fa-envelope', text: 'Messages', href: '#messages' }
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/plumber/dashboard#tasks' },
+                { icon: 'fa-wrench', text: 'Supplies', href: '/plumber/dashboard#supplies' },
+                { icon: 'fa-history', text: 'My Salary', href: '/plumber/dashboard#salary' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/plumber/dashboard#messages' }
             ]}
         ];
     }
 
-    // Gardener
     if (role === 'gardener') {
         return [
             { section: 'MAIN', items: [{ icon: 'fa-th-large', text: 'Dashboard', href: '/gardener/dashboard' }] },
             { section: 'MY WORK', items: [
-                { icon: 'fa-tasks', text: 'My Tasks', href: '#tasks' },
-                { icon: 'fa-seedling', text: 'Supplies', href: '#supplies' },
-                { icon: 'fa-history', text: 'My Salary', href: '#salary' },
-                { icon: 'fa-envelope', text: 'Messages', href: '#messages' }
+                { icon: 'fa-tasks', text: 'My Tasks', href: '/gardener/dashboard#tasks' },
+                { icon: 'fa-seedling', text: 'Supplies', href: '/gardener/dashboard#supplies' },
+                { icon: 'fa-history', text: 'My Salary', href: '/gardener/dashboard#salary' },
+                { icon: 'fa-envelope', text: 'Messages', href: '/gardener/dashboard#messages' }
             ]}
         ];
     }
@@ -280,8 +278,10 @@ function renderNav(container, menuItems) {
         html += `<div class="nav-section">
             <div class="nav-section-title">${section.section}</div>`;
         section.items.forEach(item => {
+            // Build the full hash URL correctly
+            const fullHref = item.href.startsWith('/') ? '#' + item.href : '#' + item.href;
             html += `
-                <a class="nav-link" href="${item.href.startsWith('#') ? item.href : '#' + item.href}" data-href="${item.href}">
+                <a class="nav-link" href="${fullHref}" data-href="${item.href}">
                     <i class="fas ${item.icon}"></i>
                     <span class="nav-text">${item.text}</span>
                 </a>`;
@@ -302,6 +302,10 @@ function updateActiveLink() {
         if (href && (currentHash.startsWith(href) || 
             (href === '/dashboard' && currentHash === '/dashboard') ||
             (href.startsWith('#') && window.location.hash === href))) {
+            link.classList.add('active');
+        }
+        // Also handle full-path + fragment links
+        if (href && currentHash === href) {
             link.classList.add('active');
         }
     });
