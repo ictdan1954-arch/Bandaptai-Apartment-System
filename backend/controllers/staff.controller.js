@@ -251,24 +251,36 @@ const staffController = {
         }
     },
 
-    // NEW: Get staff member by phone (used by cleaner login to get staff_role)
+    // =============================================
+    // GET STAFF MEMBER BY PHONE (fixed two‑step query)
+    // =============================================
     async getMemberByPhone(req, res) {
         try {
             const { phone } = req.params;
 
-            const { data: member, error } = await supabase
+            // Step 1: get the staff_member row (just the staff_role_id)
+            const { data: member, error: memberError } = await supabase
                 .from('staff_members')
-                .select('staff_roles(role_name)')   // join to staff_roles table
+                .select('staff_role_id')
                 .eq('phone', phone)
                 .maybeSingle();
 
-            if (error) throw error;
+            if (memberError) throw memberError;
             if (!member) {
                 return ApiResponse.notFound(res, 'Staff member not found');
             }
 
-            const roleName = member.staff_roles?.role_name || null;
-            return ApiResponse.success(res, { staff_role: roleName });
+            // Step 2: get the role name from staff_roles
+            const { data: role, error: roleError } = await supabase
+                .from('staff_roles')
+                .select('role_name')
+                .eq('id', member.staff_role_id)
+                .single();
+
+            if (roleError) throw roleError;
+            const staff_role = role?.role_name || null;
+
+            return ApiResponse.success(res, { staff_role });
         } catch (error) {
             return ApiResponse.error(res, 'Failed to fetch staff member by phone');
         }
