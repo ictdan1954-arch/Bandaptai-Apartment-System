@@ -3,7 +3,6 @@ import { authService } from '../../services/auth.service.js';
 import { showToast } from '../../components/toast.js';
 
 export default async function cleanerDashboard(container) {
-    // container = document.getElementById('page-content') (provided by the router)
     container.innerHTML = `
         <div class="page-header">
             <h2>🧹 Cleaning Dashboard</h2>
@@ -12,7 +11,7 @@ export default async function cleanerDashboard(container) {
 
         <div class="dashboard-grid">
             <!-- MY TASKS CARD -->
-            <div class="card">
+            <div class="card" id="tasks">
                 <div class="card-header">📋 My Tasks</div>
                 <div class="card-body" id="tasks-container">
                     <p>Loading tasks...</p>
@@ -20,7 +19,7 @@ export default async function cleanerDashboard(container) {
             </div>
 
             <!-- SUPPLIES CARD -->
-            <div class="card">
+            <div class="card" id="supplies">
                 <div class="card-header">🧴 Supplies</div>
                 <div class="card-body" id="supplies-container">
                     <p>Loading supplies...</p>
@@ -28,7 +27,7 @@ export default async function cleanerDashboard(container) {
             </div>
 
             <!-- TEAM VIEW CARD -->
-            <div class="card">
+            <div class="card" id="team">
                 <div class="card-header">👥 My Team</div>
                 <div class="card-body" id="team-container">
                     <p>Loading team...</p>
@@ -36,7 +35,7 @@ export default async function cleanerDashboard(container) {
             </div>
 
             <!-- SALARY CARD -->
-            <div class="card">
+            <div class="card" id="salary">
                 <div class="card-header">💰 My Salary</div>
                 <div class="card-body" id="salary-container">
                     <p>Loading salary...</p>
@@ -44,7 +43,7 @@ export default async function cleanerDashboard(container) {
             </div>
 
             <!-- MESSAGES CARD -->
-            <div class="card">
+            <div class="card" id="messages">
                 <div class="card-header">💬 Messages</div>
                 <div class="card-body" id="messages-container">
                     <button id="open-chat-btn" class="btn btn-primary btn-sm">Chat with Caretaker</button>
@@ -89,7 +88,6 @@ async function loadTasks() {
             </div>
         `).join('');
 
-        // Attach event listeners for status change
         document.querySelectorAll('.status-select').forEach(select => {
             select.addEventListener('change', async (e) => {
                 const taskId = e.target.dataset.taskId;
